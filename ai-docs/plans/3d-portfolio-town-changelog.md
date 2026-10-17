@@ -176,3 +176,27 @@ Ariann asked Claude to "do everything" and to use agents to go faster. Mentor Mo
 - Old site preserved on GitHub: branch `legacy-site` and tag `legacy-v1` at `5c2454b`. This was additive; `main` is untouched.
 - Pages currently runs `build_type: legacy` from `main`/root. At go-live: switch it to `workflow`, then push the new history onto `main` as a merge with unrelated histories (**no force-push**; the old commits stay in `main`'s history).
 - GoatCounter is free for reasonable public use (no paid plans; donations are optional).
+
+## Phase 4 + 5.2 — 3D world core ✅ (2026-10-17, world agent)
+- **`Experience`:**
+  - Canvas setup: PCF shadows on high quality, `flat` (no tone mapping, so the Kenney palette stays true), fog and a gradient sky. `PerformanceMonitor` drops to Lite.
+  - Rapier physics runs at a fixed 1/60 step and pauses while a card or the GPS is open.
+  - All GLBs and palettes start downloading in parallel at load.
+- **Town:** one `InstancedMesh` per model primitive, honouring node transforms. Per-kit shared palette materials (sRGB, `flipY` false, nearest filtering).
+  - Colliders come from rotated, off-centre-aware bounds. Roads and flat tiles are drive-through.
+  - Dynamic knockable props. Skinned mini-characters are cloned and play their idle animation. Missing models show as magenta placeholders.
+- **Vehicle:** an arcade sphere-kart (frictionless ball, CCD, driving in `useBeforePhysicsStep`) with the sedan visual: roll, pitch, wheel spin, front-wheel steering and a bounce spring. All tuning lives in `vehicle/constants.ts`.
+- **Camera:** an intro orbit that blends into the follow camera (frame-rate-independent damping, speed field of view), plus a teleport fade. Calmer with reduced motion.
+- **Zones:** 6×6 m sensors per marker that react only to the vehicle, with Billboard/Text labels. E/Enter or the touch interact button opens the card; the CV marker downloads the PDF directly.
+  - Touch axes are merged with the keyboard. M/G toggles the GPS. The first input switches to drive mode.
+  - `markVisited` is checked 4 times a second.
+- **Tests:** 52 world tests. Repo total: 11 files, 90 tests, all passing.
+
+## Integration QA (2026-10-17, Claude)
+- A headless-Chrome harness (puppeteer-core in the session scratchpad, system Chrome with SwiftShader) rendered and **drove** the town. The town, sedan, roads, cones and labels all render, and the follow camera tracks while driving. The console has only library deprecation warnings.
+- **Checked:**
+  - `/plain/` in light mode: correct.
+  - Home at 390×844: the HUD stacks correctly.
+  - `?job=speed-king` deep link: the card shows the cover, a live countdown (23 days), the Steam widget and the publisher.
+- **Label font:** drei `<Text>` now uses a local **Kenney Future** TTF (`web/public/fonts/kenney-future.ttf`, CC0) instead of downloading troika's CDN font.
+- **Districts agent launched** for the Milestone 1 layouts (home, engineering, raceway), with the screenshot harness so it can check its own output.
