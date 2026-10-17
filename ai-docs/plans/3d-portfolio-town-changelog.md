@@ -200,3 +200,27 @@ Ariann asked Claude to "do everything" and to use agents to go faster. Mentor Mo
   - `?job=speed-king` deep link: the card shows the cover, a live countdown (23 days), the Steam widget and the publisher.
 - **Label font:** drei `<Text>` now uses a local **Kenney Future** TTF (`web/public/fonts/kenney-future.ttf`, CC0) instead of downloading troika's CDN font.
 - **Districts agent launched** for the Milestone 1 layouts (home, engineering, raceway), with the screenshot harness so it can check its own output.
+
+## Phase 6 — Milestone 1 districts ✅ (2026-10-17, districts agent + Claude)
+- `web/src/world/layout/districts/{home,engineering,raceway,plots,helpers}.ts`:
+  - A connected City Kit road network (an avenue, a roundabout and a west ring road) and a closed racing-kit circuit with grandstands, pits and a billboard.
+  - Every job and game is reachable through a marker. Milestone 2 construction plots are in place.
+  - 647 placements, 115 unique models, 111+ tests (no overlaps, markers clear of colliders, roads connected).
+- **Claude:**
+  - 3D labels shrink near the camera and hide very close or very far (`labelScale`, tested).
+  - Clearer UFCG and Afya labels, and line height fixed for the Kenney font.
+- **Known gaps:** no ramp on the circuit (needs a ramp or trimesh collider), and mini-characters get box colliders.
+
+## Phase 7.1 — OG image (2026-10-17, Claude)
+- `web/public/og-image.png` (1200×630): a clean raceway render with a name/title panel. Wired into the root layout's Open Graph and Twitter metadata (`summary_large_image`).
+- **TODO:** the `/district/[id]` pages replace the openGraph block, so add `images` there too.
+
+## Status at usage-limit stop (2026-10-17)
+- **Done:** Phases 0–6, 7.1 (except the district OG images), the CV PDF, and the legacy site backup.
+- **Left:**
+  - Add the OG image to the district pages
+  - Real-device and Lighthouse pass (7.3)
+  - Human testing doc (7.4)
+  - Go-live (switch Pages to Actions, then merge-push to `main`), **waiting on Ariann's approval**
+  - GoatCounter site creation (Ariann)
+  - CV header name choice (Ariann)

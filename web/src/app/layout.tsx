@@ -22,16 +22,17 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://ariannmichael.github.io"),
   title,
   description,
-  // TODO(phase 7): add images: "/og-image.png" to openGraph and twitter.
   openGraph: {
     type: "website",
     siteName: "Ariann Michael",
     locale: "en_US",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ariann Michael's 3D portfolio town" }],
     title,
     description,
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
+    images: ["/og-image.png"],
     title,
     description,
   },
