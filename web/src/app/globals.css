@@ -1,0 +1,126 @@
+/* Design tokens shared by the overlay UI and the Plain View. Components use CSS modules + these vars. */
+:root {
+  --bg: #f6f1e7;
+  --surface: #ffffff;
+  --surface-2: #efe7d8;
+  --text: #1d1b16;
+  --text-muted: #5c5547;
+  --border: #d9cfbd;
+  --accent: #e8572a; /* Kenney-orange: primary actions, CV button */
+  --accent-text: #ffffff;
+  --accent-2: #2a7de8; /* links, focus */
+  --success: #2f9e5b;
+  --warning: #e0a100;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-2) 55%, transparent);
+
+  --overlay-bg: color-mix(in srgb, var(--surface) 88%, transparent);
+  --overlay-blur: 10px;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.14);
+
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15140f;
+    --surface: #1f1d17;
+    --surface-2: #2a2720;
+    --text: #f3eee4;
+    --text-muted: #b3ab9b;
+    --border: #3a362c;
+    --accent: #ff6a3d;
+    --accent-2: #5ea3ff;
+    --overlay-bg: color-mix(in srgb, var(--surface) 86%, transparent);
+    --shadow: 0 6px 24px rgb(0 0 0 / 0.45);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15140f;
+  --surface: #1f1d17;
+  --surface-2: #2a2720;
+  --text: #f3eee4;
+  --text-muted: #b3ab9b;
+  --border: #3a362c;
+  --accent: #ff6a3d;
+  --accent-2: #5ea3ff;
+  --overlay-bg: color-mix(in srgb, var(--surface) 86%, transparent);
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent-2);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
