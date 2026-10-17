@@ -11,7 +11,7 @@ describe("countdown", () => {
   });
 
   it("counts down before the release", () => {
-    const now = Date.parse("2026-11-08T15:58:30Z"); // 2d 1h 1m 30s before
+    const now = Date.parse("2026-11-08T16:58:30Z"); // 2d 1h 1m 30s before
     expect(getCountdown(now, release)).toEqual({
       released: false,
       days: 2,
