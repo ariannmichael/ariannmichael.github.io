@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "models": "node scripts/prepare-models.mjs",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "cv": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-cv.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
