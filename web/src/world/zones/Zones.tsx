@@ -11,7 +11,7 @@ import { vehicleState } from "@/world/vehicle/vehicleState";
 import { ZONE_HEIGHT, ZONE_SIZE, markerLabel } from "./markers";
 
 /** Optional local font for labels. Without one, troika loads its default font from a CDN. */
-const LABEL_FONT: string | undefined = undefined;
+const LABEL_FONT: string | undefined = "/fonts/kenney-future.ttf"; // Kenney Future, CC0 (kenney.nl), served locally
 const LABEL_HEIGHT = 5.2;
 
 const isVehicle = (payload: IntersectionEnterPayload) =>
