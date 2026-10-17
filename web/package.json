@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "models": "node ../tools/prepare-models.mjs",
+    "models": "node scripts/prepare-models.mjs",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
