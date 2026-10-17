@@ -141,8 +141,8 @@ const markers: Marker[] = [
   { id: "about", kind: "about", x: -1, z: -13, label: "About me" },
   { id: "contact", kind: "contact", x: -1, z: -10.75, label: "Contact" },
   { id: "cv", kind: "cv", x: 1, z: -13.9, label: "Download CV" },
-  { id: "ufcg", kind: "job", x: 1, z: -10 },
-  { id: "ufcg-monitor", kind: "job", x: 1, z: -6 },
+  { id: "ufcg", kind: "job", x: 1, z: -10, label: "UFCG · Computer Science" },
+  { id: "ufcg-monitor", kind: "job", x: 1, z: -6, label: "UFCG · Teaching assistant" },
   { id: "proj4me", kind: "job", x: 1, z: -3 },
 ];
 

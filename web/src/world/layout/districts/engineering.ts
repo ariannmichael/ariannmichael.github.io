@@ -126,12 +126,12 @@ const surroundings: Placement[] = [
 ];
 
 const markers: Marker[] = [
-  { id: "afya-2026", kind: "job", x: 1, z: 3.1 },
+  { id: "afya-2026", kind: "job", x: 1, z: 3.1, label: "Afya · Current role" },
   { id: "gofasti", kind: "job", x: 1, z: 7.3 },
   { id: "drchrono", kind: "job", x: 1, z: 10.8 },
   { id: "fullstack", kind: "job", x: 1, z: 13.4 },
   { id: "stefanini", kind: "job", x: -1, z: 3.2 },
-  { id: "afya-2021", kind: "job", x: -1, z: 7.2 },
+  { id: "afya-2021", kind: "job", x: -1, z: 7.2, label: "Afya Educacional" },
   { id: "openmined", kind: "job", x: -7, z: 5 },
   // Game Dev corner: one marker in front of each cabinet
   { id: "shoot-em-all", kind: "game", x: ARCADE_X[0], z: 10 },
