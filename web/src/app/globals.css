@@ -6,12 +6,12 @@
   --text: #1d1b16;
   --text-muted: #5c5547;
   --border: #d9cfbd;
-  --accent: #e8572a; /* Kenney-orange: primary actions, CV button */
+  --accent: #c2410c; /* Kenney-orange: primary actions, CV button (5.2:1 with white) */
   --accent-text: #ffffff;
-  --accent-2: #2a7de8; /* links, focus */
+  --accent-2: #1d63c4; /* links, focus (5.1:1 on --bg) */
   --success: #2f9e5b;
   --warning: #e0a100;
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-2) 55%, transparent);
+  --focus-ring: 0 0 0 3px var(--accent-2);
 
   --overlay-bg: color-mix(in srgb, var(--surface) 88%, transparent);
   --overlay-blur: 10px;
@@ -49,6 +49,7 @@
     --text-muted: #b3ab9b;
     --border: #3a362c;
     --accent: #ff6a3d;
+    --accent-text: #1d1b16; /* 6:1 on the bright dark-mode orange */
     --accent-2: #5ea3ff;
     --overlay-bg: color-mix(in srgb, var(--surface) 86%, transparent);
     --shadow: 0 6px 24px rgb(0 0 0 / 0.45);
@@ -64,6 +65,7 @@
   --text-muted: #b3ab9b;
   --border: #3a362c;
   --accent: #ff6a3d;
+  --accent-text: #1d1b16;
   --accent-2: #5ea3ff;
   --overlay-bg: color-mix(in srgb, var(--surface) 86%, transparent);
   --shadow: 0 6px 24px rgb(0 0 0 / 0.45);

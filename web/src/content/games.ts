@@ -1,4 +1,67 @@
 import type { Game } from "./types";
 
-// Stub: the content agent fills this
-export const games: Game[] = [];
+// Only facts we know. Covers come from the old site and the Steam header; clips and embedUrls are added once they exist.
+export const games: Game[] = [
+  {
+    id: "speed-king",
+    title: "Speed King",
+    platform: "steam",
+    tagline:
+      "A bonkers multiplayer racing game for up to 4 local players, with pigs, kaijus, wheelchairs and power-ups.",
+    genre: "Combat racing · Party",
+    url: "https://store.steampowered.com/app/4669300/Speed_King/",
+    steamAppId: 4669300,
+    releaseDate: "2026-11-10",
+    publisher: "OutOfBoundsGames",
+    cover: "/media/games/speed-king.jpg",
+    district: "raceway",
+  },
+  {
+    id: "shoot-em-all",
+    title: "Shoot 'Em All",
+    platform: "itch",
+    tagline: "A shmup with rock thematics (demo).",
+    genre: "Shooter",
+    url: "https://ariannmichael.itch.io/shoot-them-all",
+    cover: "/media/games/shoot-em-all.png",
+    district: "gamedev",
+  },
+  {
+    id: "rat-catcher",
+    title: "Rat Catcher",
+    platform: "itch",
+    tagline: "Play it on itch.io.",
+    genre: "Indie",
+    url: "https://ariannmichael.itch.io/rat-catcher",
+    cover: "/media/games/rat-catcher.png",
+    district: "gamedev",
+  },
+  {
+    id: "lead-me-to-the-light",
+    title: "Lead Me To The Light",
+    platform: "itch",
+    tagline: "A platformer made for Godot Wild Jam #64.",
+    genre: "Platformer",
+    url: "https://ariannmichael.itch.io/lead-me-to-the-light",
+    cover: "/media/games/lead-me-to-the-light.png",
+    district: "gamedev",
+  },
+  {
+    id: "get-notes",
+    title: "Get Notes",
+    platform: "itch",
+    tagline: "A puzzle game. Play it on itch.io.",
+    genre: "Puzzle",
+    url: "https://ariannmichael.itch.io/get-notes",
+    district: "gamedev",
+  },
+  {
+    id: "super-mega-ultra-pong",
+    title: "Super Mega Ultra Pong",
+    platform: "itch",
+    tagline: "A Pong game.",
+    genre: "Arcade",
+    url: "https://ariannmichael.itch.io/super-mega-ultra-pong",
+    district: "gamedev",
+  },
+];

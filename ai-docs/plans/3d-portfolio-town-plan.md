@@ -141,9 +141,9 @@ portfolio/
   - **Measured sizes (input for scale test 3.1.3):** road tile = 1 × 1 unit (roundabout 3 × 3). `building-a` ≈ 0.9 × 1.3 × 0.9. `building-skyscraper-a` ≈ 1.4 × 2.9 × 1.4. `building-type-a` ≈ 1.3 × 0.8 × 1.0. `sedan-sports` = 1.3 × 1.25 × 2.55. → **City kits need roughly ×8 relative to the sedan** (e.g. an 8 m road tile for a ~4 m car, with the sedan at ×1.6). Racing Kit still to measure
 - [x] **0.3 Answer the open questions** at the bottom of this document (2026-10-17). All answered except **Q8 (media)**, which isn't needed until Phase 6.4 and is tracked in step 0.5. CV edits are listed in `ai-docs/sources/cv-update.md`
 - [ ] **0.4 Tooling**
-  - [ ] 0.4.1 Pin **Node 24 LTS** (updated from 22: 24 is the active LTS, and 22 is in maintenance only). nvm already has `v24.11.1`. Add `portfolio/.nvmrc` containing `24` and run `nvm use` in the project. CI reads the same file via `node-version-file: .nvmrc`. `"engines"` goes into `web/package.json` in step 1.2. The Homebrew Node 25 stays as the system default; it just isn't used for this project
-  - [ ] 0.4.2 Install the global CLIs **under Node 24** (nvm keeps globals per Node version): `@gltf-transform/cli`, `gltfjsx`
-  - [ ] 0.4.3 Install the GitHub CLI (`brew install gh`) and run `gh auth login`. It's needed in Phase 1 for the repo, Pages settings and Actions logs
+  - [x] 0.4.1 Pin **Node 24 LTS**: `.nvmrc` created. In non-interactive shells `nvm use` does not reach PATH here, so automation uses `export PATH="$HOME/.nvm/versions/node/v24.11.1/bin:$PATH"` (updated from 22: 24 is the active LTS, and 22 is in maintenance only). nvm already has `v24.11.1`. Add `portfolio/.nvmrc` containing `24` and run `nvm use` in the project. CI reads the same file via `node-version-file: .nvmrc`. `"engines"` goes into `web/package.json` in step 1.2. The Homebrew Node 25 stays as the system default; it just isn't used for this project
+  - [x] 0.4.2 Install the global CLIs **under Node 24**: `@gltf-transform/cli` 4.5.1 and `gltfjsx` 6.5.3 (also present under Homebrew Node 25). The model pipeline itself uses the gltf-transform **Node API** from `web/node_modules`
+  - [ ] 0.4.3 GitHub CLI: `gh` 2.102.0 is installed ✅. **`gh auth login` is still pending (needs Ariann, interactive)**. Git over SSH already works (`git@github.com` authenticates as ariannmichael)
   - [x] 0.4.4 Use Godot **4.7** for `level/`. Verified installed: `4.7.stable.official.5b4e0cb0f` (`/Applications/Godot4.7.app`). Do not open `level/` with the other 4.x builds you have installed
 - [ ] **0.5 Gather media**
   - [ ] 0.5.1 Speed King: trailer (mp4/webm), 4–6 screenshots, capsule art, logo
@@ -153,19 +153,22 @@ portfolio/
 
 ### Phase 1 — Project Scaffold & Deploy Pipeline (deploy on day one)
 
+> **Build mode change (2026-10-17):** Ariann asked Claude to implement everything directly, using parallel agents. Workstreams and ownership: `ai-docs/plans/agent-workstreams.md`. **Godot is no longer in the build path:** districts are TypeScript layout data (`web/src/world/layout/`), rendered with instancing, with colliders from model bounds. This replaces the Godot scene contract in Phases 3 and 6.
+
 - [ ] **1.1 Repository**
-  - [ ] 1.1.1 `git init` in `portfolio/`, add `.gitignore` (`node_modules`, `dist`, `level/.godot/`, `level-export/`, `.DS_Store`)
+  - [x] 1.1.1 `git init` in `portfolio/` (branch `main`), add `.gitignore` (`node_modules`, `dist`, `level/.godot/`, `level-export/`, `.DS_Store`)
   - [ ] 1.1.2 Deploy target: the **existing `ariannmichael/ariannmichael.github.io` repo** (decided 2026-10-17). Clone it, push its current `main` to a `legacy-site` branch and tag it, then replace `main` with this project (`git remote add origin` → that repo)
-- [ ] **1.2 Next.js app**
-  - [ ] 1.2.1 `npx create-next-app@latest web` with TypeScript, ESLint, App Router and the `src/` directory. No Tailwind unless you want it (decide here)
-  - [ ] 1.2.2 Install the runtime deps: `three @react-three/fiber @react-three/drei @react-three/rapier zustand`
-  - [ ] 1.2.3 Install the dev deps: `@types/three r3f-perf leva`, plus Prettier
-  - [ ] 1.2.4 `next.config.ts`: `output: 'export'` (static HTML into `web/out/`), `images: { unoptimized: true }` (the image optimizer needs a server, which GitHub Pages doesn't have), `trailingSlash: true` (so `/plain/` maps to `plain/index.html` on Pages), and `transpilePackages: ['three']` if needed. No `basePath`, because it's a user site served at the root
-  - [ ] 1.2.5 `src/world/WorldLoader.tsx`: `next/dynamic(() => import('./Experience'), { ssr: false })`. three.js, WebGL and Rapier's WASM only exist in the browser, so the canvas must never render on the server. Any file using hooks or R3F starts with `'use client'`
-  - [ ] 1.2.6 Render a placeholder `<Canvas>` with a spinning box and `<OrbitControls>` to prove the stack works in `next dev` **and** in the exported build (`npx serve out`)
-  - [ ] 1.2.7 Add an empty `public/.nojekyll`
+- [x] **1.2 Next.js app**
+  - [x] 1.2.1–1.2.7 Done 2026-10-17: Next **16.4.2**, React 19.3, three 0.186, R3F 9.8, drei 10.7, rapier 2.2, zustand 5. `cacheComponents`/`partialPrefetching` removed (they need a Node server). `@types/node` bumped to ^24 for Vitest 5. Placeholder canvas builds to `out/`, and `.nojekyll` is present
+  - [x] 1.2.1 `npx create-next-app@latest web` with TypeScript, ESLint, App Router and the `src/` directory. No Tailwind unless you want it (decide here)
+  - [x] 1.2.2 Install the runtime deps: `three @react-three/fiber @react-three/drei @react-three/rapier zustand`
+  - [x] 1.2.3 Install the dev deps: `@types/three r3f-perf leva`, plus Prettier
+  - [x] 1.2.4 `next.config.ts`: `output: 'export'` (static HTML into `web/out/`), `images: { unoptimized: true }` (the image optimizer needs a server, which GitHub Pages doesn't have), `trailingSlash: true` (so `/plain/` maps to `plain/index.html` on Pages), and `transpilePackages: ['three']` if needed. No `basePath`, because it's a user site served at the root
+  - [x] 1.2.5 `src/world/WorldLoader.tsx`: `next/dynamic(() => import('./Experience'), { ssr: false })`. three.js, WebGL and Rapier's WASM only exist in the browser, so the canvas must never render on the server. Any file using hooks or R3F starts with `'use client'`
+  - [x] 1.2.6 Render a placeholder `<Canvas>` with a spinning box and `<OrbitControls>` to prove the stack works in `next dev` **and** in the exported build (`npx serve out`)
+  - [x] 1.2.7 Add an empty `public/.nojekyll`
 - [ ] **1.3 GitHub Actions → Pages**
-  - [ ] 1.3.1 `.github/workflows/deploy.yml`: checkout → `actions/setup-node` with `node-version-file: .nvmrc` (Node 24) → `npm ci` → `npm run build` in `web/` → `actions/upload-pages-artifact` with `path: web/out` → `actions/deploy-pages`
+  - [x] 1.3.1 (written 2026-10-17; it also runs typecheck, lint and tests before the build) `.github/workflows/deploy.yml`: checkout → `actions/setup-node` with `node-version-file: .nvmrc` (Node 24) → `npm ci` → `npm run build` in `web/` → `actions/upload-pages-artifact` with `path: web/out` → `actions/deploy-pages`
   - [ ] 1.3.2 Repo Settings → Pages → Source: GitHub Actions
   - [ ] 1.3.3 Verify the placeholder is live at the public URL
 - [ ] **1.4 Testing baseline**
@@ -174,25 +177,25 @@ portfolio/
 
 ### Phase 2 — Content Layer & Plain View (the safety net)
 
-- [ ] **2.1 Types** (`web/src/content/types.ts`)
-  - [ ] 2.1.1 `Job` { id, company, role, district, start, end, location, summary, highlights[], metrics[] {label, value}, stack[] }
-  - [ ] 2.1.2 `Game` { id, title, platform: 'steam' | 'itch', tagline, genre, url, embedUrl?, steamAppId?, releaseDate?, cover, clip?, district }
-  - [ ] 2.1.3 `Skill` { id, name, category, level }
-  - [ ] 2.1.4 `DistrictId` union type, `Links` (email, github, linkedin, itch, steam, cv)
-- [ ] **2.2 Data**. **Source of truth for experience: LinkedIn (https://www.linkedin.com/in/ariann-michael)**. LinkedIn blocks automated fetching (HTTP 999), so Ariann provides a **"Save to PDF"** of the profile (profile → Resources/More → Save to PDF) saved as `ai-docs/sources/linkedin-profile.pdf`. Where LinkedIn and the CV disagree, LinkedIn wins
+- [x] **2.1 Types** (`web/src/content/types.ts`)
+  - [x] 2.1.1 `Job` { id, company, role, district, start, end, location, summary, highlights[], metrics[] {label, value}, stack[] }
+  - [x] 2.1.2 `Game` { id, title, platform: 'steam' | 'itch', tagline, genre, url, embedUrl?, steamAppId?, releaseDate?, cover, clip?, district }
+  - [x] 2.1.3 `Skill` { id, name, category, level }
+  - [x] 2.1.4 `DistrictId` union type, `Links` (email, github, linkedin, itch, steam, cv)
+- [x] **2.2 Data**. **Source of truth for experience: LinkedIn (https://www.linkedin.com/in/ariann-michael)**. LinkedIn blocks automated fetching (HTTP 999), so Ariann provides a **"Save to PDF"** of the profile (profile → Resources/More → Save to PDF) saved as `ai-docs/sources/linkedin-profile.pdf`. Where LinkedIn and the CV disagree, LinkedIn wins
   - [x] 2.2.0 Read the LinkedIn PDF and reconcile it with the CV in `ai-docs/sources/experience-reconciliation.md` (done 2026-10-17; conflicts C1–C8 are listed there)
-  - [ ] 2.2.1 `jobs.ts`: copy roles, dates, highlights, metric chips and stacks **from the reconciliation doc**. In order: Afya (Squad Lead, 2026–present, **current**), DrChrono by EverHealth, GoFasti (client: PlanetBids), FullStack (client: GoDaddy), Afya Educacional, OpenMined, Stefanini Brasil, Proj4me (internship), UFCG Monitor, and UFCG BS CS (education). Add a `client?: string` field to `Job` for PlanetBids/GoDaddy and `current?: boolean` for the "Current role" badge
-  - [ ] 2.2.2 `games.ts`: Speed King (Steam 4669300, release 2026-11-10, OutOfBoundsGames), Shoot 'Em All, Rat Catcher, Lead Me To The Light, Get Notes, Super Mega Ultra Pong
-  - [ ] 2.2.3 `skills.ts`: grouped as on the CV (Frontend, Backend, Architecture, Testing, Infra) plus Game Dev (Godot, Unity)
-- [ ] **2.3 Plain View** (`web/src/ui/PlainView.tsx`)
-  - [ ] 2.3.1 Semantic HTML: `header` (name, role, CV button), `section`s for Experience / Games / Skills / Contact, and a footer with the Kenney credit
-  - [ ] 2.3.2 WCAG: heading order, focus styles, link text, contrast ≥ 4.5:1, `prefers-reduced-motion`
-  - [ ] 2.3.3 A real pre-rendered page at **`/plain/`** (`src/app/plain/page.tsx`, a Server Component with no `'use client'` and no three.js in its bundle), linked from a "Plain view" button that is always visible in the 3D overlay
-  - [ ] 2.3.4 Fix the issues from the old site: typos, the broken CV button, missing GoFasti/DrChrono, missing Get Notes/Pong
+  - [x] 2.2.1 `jobs.ts`: copy roles, dates, highlights, metric chips and stacks **from the reconciliation doc**. In order: Afya (Squad Lead, 2026–present, **current**), DrChrono by EverHealth, GoFasti (client: PlanetBids), FullStack (client: GoDaddy), Afya Educacional, OpenMined, Stefanini Brasil, Proj4me (internship), UFCG Monitor, and UFCG BS CS (education). Add a `client?: string` field to `Job` for PlanetBids/GoDaddy and `current?: boolean` for the "Current role" badge
+  - [x] 2.2.2 `games.ts`: Speed King (Steam 4669300, release 2026-11-10, OutOfBoundsGames), Shoot 'Em All, Rat Catcher, Lead Me To The Light, Get Notes, Super Mega Ultra Pong
+  - [x] 2.2.3 `skills.ts`: grouped as on the CV (Frontend, Backend, Architecture, Testing, Infra) plus Game Dev (Godot, Unity)
+- [x] **2.3 Plain View** (built as `web/src/app/plain/page.tsx` + components in `web/src/ui/plain/`)
+  - [x] 2.3.1 Semantic HTML: `header` (name, role, CV button), `section`s for Experience / Games / Skills / Contact, and a footer with the Kenney credit
+  - [x] 2.3.2 WCAG: heading order, focus styles, link text, contrast ≥ 4.5:1, `prefers-reduced-motion`
+  - [x] 2.3.3 A real pre-rendered page at **`/plain/`** (`src/app/plain/page.tsx`, a Server Component with no `'use client'` and no three.js in its bundle), linked from a "Plain view" button that is always visible in the 3D overlay
+  - [x] 2.3.4 Fix the issues from the old site: typos, the broken CV button, missing GoFasti/DrChrono, missing Get Notes/Pong
 - [ ] **2.4 SEO basics**
-  - [ ] 2.4.1 Next `metadata` export in `layout.tsx`: title "Ariann Michael · Senior Software Engineer & Game Developer", description, `metadataBase: https://ariannmichael.github.io`, canonical, Open Graph and Twitter tags (image added in Phase 7)
+  - [x] 2.4.1 Next `metadata` export in `layout.tsx`: title "Ariann Michael · Senior Software Engineer & Game Developer", description, `metadataBase: https://ariannmichael.github.io`, canonical, Open Graph and Twitter tags (image added in Phase 7)
   - [ ] 2.4.2 The `/` page server-renders the overlay text (name, role, CV link, Plain view link) as HTML, so there's useful content even before or without JavaScript
-  - [ ] 2.4.3 JSON-LD `Person` schema with sameAs links (GitHub, LinkedIn, itch, Steam)
+  - [x] 2.4.3 JSON-LD `Person` schema with sameAs links (GitHub, LinkedIn, itch, Steam)
 - [ ] **2.5 Deploy** the Plain View. From this point the site is never "broken" for recruiters
 
 ### Phase 3 — Asset Pipeline (Kenney GLB → Godot → glTF → web)
