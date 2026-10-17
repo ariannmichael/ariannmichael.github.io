@@ -134,3 +134,45 @@ Ariann asked Claude to "do everything" and to use agents to go faster. Mentor Mo
 - Passed the canonical-URL guidance, the token change and the `trackEvent` location to the UI agent.
 
 **Still open:** the GoatCounter site must be created by Ariann. The CV PDF is missing from `web/public/cv/` (the link 404s until it's added).
+
+## Phase 3 — Asset pipeline (Kenney → web) ✅ (2026-10-17, assets agent)
+- `web/scripts/prepare-models.mjs` + `kits.config.mjs` (a scale and one-line rationale per kit) + `inspect-model.mjs` (debug tool). Run with `npm run models`, or `npm run models -- <kit>…` to rebuild only some kits.
+- **Output:** 23 kits and 1,939 models in `web/public/models/<kit>/<model>.glb`, **17.3 MB** in total.
+  - Meshopt-compressed. Node hierarchy and names are preserved, and positions aren't quantized, so the wheel nodes keep their transforms.
+  - Each textured kit shares one **lossless** WebP palette (`colormap.webp`, 2–13 KB). Racing and space kits use flat colours.
+- `web/src/world/models/manifest.generated.ts` and `index.ts` (`getModel`, `hasModel`, `getKit`, `listModels`, `footprint`, `rotatedBounds`). 10 tests.
+- **Key scales:** city kits and racing ×8 (tile = 8 m), car-kit ×1.7 (the sedan is 4.34 m long), mini kits and characters ×2.5, coaster ×4, pirate ×2 (tower = 20 m lighthouse), food ×10 (giant roadside props).
+- **Rendering notes** were passed to the world agent: the kit scale isn't baked in, palette materials are shared, characters are skinned, models face +Z, and some origins are off-centre.
+
+## Phase 5 — Overlay UI ✅ (2026-10-17, UI agent)
+- **Server-rendered `AppShell`:** name, headline, Download CV and Plain view as static HTML, plus client islands.
+- **Overlay:**
+  - A WebGL2 check, with a fallback panel when it's missing
+  - The loader (a car on a road)
+  - The controls hint
+  - The "Press E / Tap" prompt
+  - A reduced-motion notice
+- **`HudControls`:** GPS, sound and quality buttons.
+- **Shared `Modal`:** a dialog with a focus trap, Esc to close, click-outside to close and focus return.
+- **`InfoCard`:**
+  - Job cards
+  - Game cards: the Steam widget, a countdown, Wishlist → Buy, and the itch Play modal, which loads the iframe only after a click
+  - About, Contact and CV cards
+- **`GpsMenu`:** Milestone 1 districts teleport, Milestone 2 districts show "Under construction", and visited districts get a badge.
+- **`TouchControls`:** a joystick plus brake, interact and reset buttons, writing to `useInputStore`.
+- **Routes:**
+  - `?job=` deep link.
+  - `/district/[id]/` (all 7 pages pre-rendered), with per-page canonical, OG and Twitter metadata.
+  - Canonical `/` and `viewport-fit=cover` on the home page.
+- **Tests:** 26 UI tests.
+- **Claude fix:** the release instant changed from 17:00 to **18:00 UTC** (10:00 PST on Nov 10), and the test fixture was updated to match.
+
+## CV PDF ✅ (2026-10-17, Claude)
+- `web/scripts/generate-cv.mjs` (`npm run cv`) imports the same content `.ts` files as the site (Node 24 type stripping) and prints an ATS-friendly US Letter PDF with headless Chrome → `web/public/cv/Ariann_Michael_CV.pdf` (2 pages).
+- The header uses the full name "Ariann Michael Farias" (LinkedIn), with a CV-toned summary. Regenerate it whenever the content changes.
+- English is now set to "bilingual" (Ariann's answer).
+
+## Deploy prep (2026-10-17, Claude)
+- Old site preserved on GitHub: branch `legacy-site` and tag `legacy-v1` at `5c2454b`. This was additive; `main` is untouched.
+- Pages currently runs `build_type: legacy` from `main`/root. At go-live: switch it to `workflow`, then push the new history onto `main` as a merge with unrelated histories (**no force-push**; the old commits stay in `main`'s history).
+- GoatCounter is free for reasonable public use (no paid plans; donations are optional).
