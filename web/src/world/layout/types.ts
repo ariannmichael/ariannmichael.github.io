@@ -5,7 +5,7 @@ import type { DistrictId } from "@/content/types";
 
 export const TILE = 8;
 
-/** "<kit>/<model>", e.g. "city-roads/road-straight". Kits and their scales live in world/models/kits.ts */
+/** "<kit>/<model>", e.g. "city-roads/road-straight". Kits and their scales: world/models/index.ts (getKit), generated from web/scripts/kits.config.mjs */
 export type ModelRef = `${string}/${string}`;
 
 /** Quarter turns around +Y (counter-clockwise seen from above). */
