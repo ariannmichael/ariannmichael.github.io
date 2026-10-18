@@ -301,3 +301,4 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 ### Decisions (2026-10-18, Ariann)
 - **Ship v2 only:** v1 is never released. The planet must be live before 2026-11-10.
 - **CV header name: "Ariann Michael Farias"**, confirmed. That is already the value in `web/scripts/generate-cv.mjs` (`CV_NAME`), so the PDF needs no change. The site keeps "Ariann Michael".
+- **GoatCounter site created** by Ariann (`ariannmichael`). The site already loads `https://ariannmichael.goatcounter.com/count` with `//gc.zgo.at/count.js` (via `next/script`, `afterInteractive`, the equivalent of `async`), so no code change was needed. The endpoint answered 200. Claude's check sent one test pageview, `/test-from-build`.
