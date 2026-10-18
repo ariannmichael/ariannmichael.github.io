@@ -1,35 +1,42 @@
 "use client";
 
-// Deep import of drei's progress store (same module the world uses via "@react-three/drei"):
-// keeps the overlay bundle from pulling all of drei just for a loading bar.
-import { useProgress } from "@react-three/drei/core/Progress";
+// Progress comes from the world's spawn-biome status (a tiny zustand store, no three.js/drei), not
+// drei's global loading manager: that one also counts background downloads of the far side of the
+// planet, which would keep the bar up long after the car can drive.
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/state/useAppStore";
+import { spawnProgress, useSpawnLoad } from "@/world/town/loadStatus";
 import styles from "./Loader.module.css";
 
-// If nothing has started loading after this long, assume the world has no tracked assets.
+// If the world hasn't started loading after this long, assume it has nothing to track.
 const IDLE_GRACE_MS = 6000;
+// Never keep the bar up forever (e.g. a lost WebGL context): the HTML around it works regardless.
+const MAX_WAIT_MS = 45000;
 
 /**
  * Small, non-blocking loading bar: a toy car driving along a road. Sits at the bottom, ignores
  * pointer events, and fades out at 100%. The server-rendered name and CV stay usable meanwhile.
  */
 export default function Loader() {
-  const progress = useProgress((s) => s.progress);
-  const active = useProgress((s) => s.active);
-  const total = useProgress((s) => s.total);
-  const loaded = useProgress((s) => s.loaded);
+  const progress = useSpawnLoad(spawnProgress);
+  const ready = useSpawnLoad((s) => s.ready);
+  const started = useSpawnLoad((s) => s.biome !== "");
   const mode = useAppStore((s) => s.mode);
   const [graceOver, setGraceOver] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   const [gone, setGone] = useState(false);
 
   useEffect(() => {
-    const id = window.setTimeout(() => setGraceOver(true), IDLE_GRACE_MS);
-    return () => window.clearTimeout(id);
+    const grace = window.setTimeout(() => setGraceOver(true), IDLE_GRACE_MS);
+    const max = window.setTimeout(() => setTimedOut(true), MAX_WAIT_MS);
+    return () => {
+      window.clearTimeout(grace);
+      window.clearTimeout(max);
+    };
   }, []);
 
-  const finished =
-    (loaded > 0 && !active && progress >= 100) || (graceOver && !active && total === 0) || mode !== "intro";
+  // Up until the spawn biome is downloaded, instanced and has its shaders compiled
+  const finished = ready || (graceOver && !started) || timedOut || mode !== "intro";
   const pct = finished ? 100 : Math.max(0, Math.min(100, Math.round(progress)));
 
   if (gone) return null;

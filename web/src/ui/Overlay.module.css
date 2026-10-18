@@ -1,0 +1,15 @@
+/* Pointer-specific variants chosen in CSS, not JS, so server HTML and the hydrated page match. */
+.coarseOnly {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .coarseOnly.coarseOnly {
+    display: block;
+  }
+
+  /* Doubled class: beats the hint list's own `display: flex` whatever order the sheets load in */
+  .fineOnly.fineOnly {
+    display: none;
+  }
+}

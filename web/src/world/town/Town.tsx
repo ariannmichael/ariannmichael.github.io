@@ -1,10 +1,9 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { TextureLoader, Vector3 } from "three";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Vector3 } from "three";
 import {
   biomesInRange,
   byDistance,
@@ -12,12 +11,13 @@ import {
   type Cap,
 } from "@/world/lib/biomeMap";
 import { onIdle } from "@/world/lib/idle";
-import { lookupKit, lookupModel } from "@/world/lib/models";
 import { latLonToDir } from "@/world/planet/frame";
 import type { BiomeLayout, LatLon } from "@/world/planet/types";
 import { vehicleState } from "@/world/vehicle/vehicleState";
 import { BiomeZones } from "@/world/zones/Zones";
+import { isLayoutLoaded, loadLayout, markGroupReady, PRIORITY } from "./assets";
 import { biomeColliderBoxes } from "./colliders";
+import { useSpawnLoad } from "./loadStatus";
 import { groupByModel } from "./group";
 import { ModelErrorBoundary } from "./ModelErrorBoundary";
 import { ModelGroupView, Placeholders } from "./ModelGroupView";
@@ -30,56 +30,15 @@ export const STREAM_UNLOAD_DEG = 90;
 const STREAM_CHECK_INTERVAL = 0.5;
 /** Model groups mounted per frame while a biome streams in (spreads instancing over frames) */
 const GROUPS_PER_FRAME = 3;
-
-/** Model URLs and palette textures a layout needs (deduplicated, in placement order). */
-function layoutAssets(layout: BiomeLayout): {
-  models: string[];
-  textures: string[];
-} {
-  const models = new Set<string>();
-  const textures = new Set<string>();
-  for (const p of layout.placements) {
-    const info = lookupModel(p.model);
-    if (!info) continue;
-    models.add(info.url);
-    const tex = lookupKit(info.kit)?.texture;
-    if (tex) textures.add(tex);
-  }
-  return { models: [...models], textures: [...textures] };
-}
-
-/** Start downloading a layout's models and palettes now (no-op for anything already cached). */
-export function preloadLayout(layout: BiomeLayout): void {
-  const { models, textures } = layoutAssets(layout);
-  for (const url of models) useGLTF.preload(url, false);
-  for (const url of textures) useLoader.preload(TextureLoader, url);
-}
-
-/**
- * Preload the remaining layouts one model at a time in idle callbacks, so glTF parsing never lands
- * in one long task during page load. Returns a cancel function.
- */
-export function preloadInIdle(layouts: readonly BiomeLayout[]): () => void {
-  const queue: (() => void)[] = [];
-  for (const l of layouts) {
-    const { models, textures } = layoutAssets(l);
-    for (const url of textures)
-      queue.push(() => useLoader.preload(TextureLoader, url));
-    for (const url of models) queue.push(() => useGLTF.preload(url, false));
-  }
-  let cancel = () => {};
-  const step = () => {
-    queue.shift()?.();
-    if (queue.length) cancel = onIdle(step);
-  };
-  cancel = onIdle(step);
-  return () => cancel();
-}
+/** Static colliders added per frame (Rapier collider creation is cheap but not free) */
+const COLLIDERS_PER_FRAME = 64;
+/** Neighbour biomes start streaming after this long even if the spawn biome never reports ready */
+const SPAWN_GATE_TIMEOUT_MS = 12000;
 
 /**
  * Every biome near the car: instanced placements, one fixed body of oriented box colliders per biome,
  * dynamic props, skinned characters, and marker zones. Biomes stream in nearest first, one per idle
- * callback, and stream out once the car is far away.
+ * callback, and stream out once the car is far away. Downloads are prioritised in ./assets.
  */
 export function PlanetTown({
   layouts,
@@ -135,14 +94,17 @@ export function PlanetTown({
     if (changed || order.some((i) => !m.includes(i))) setDirty((d) => d + 1);
   });
 
-  // Add one wanted layout per idle callback, nearest first
+  // Add one wanted layout per idle callback, nearest first. Neighbours wait for the spawn biome, so
+  // their downloads, parsing and instancing never compete with what the player sees first.
+  const gateOpen = useSpawnGate();
   useEffect(() => {
+    if (!gateOpen && mounted.length > 0) return;
     const next = wanted.current.find((i) => !mounted.includes(i));
     if (next === undefined) return;
     return onIdle(() =>
       setMounted((m) => (m.includes(next) ? m : [...m, next])),
     );
-  }, [mounted, dirty]);
+  }, [mounted, dirty, gateOpen]);
 
   return (
     <>
@@ -155,32 +117,76 @@ export function PlanetTown({
 
 const _dir = new Vector3();
 
+/** True once the spawn biome is ready (or after a timeout, so streaming can never stall). */
+function useSpawnGate(): boolean {
+  const ready = useSpawnLoad((s) => s.ready);
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    if (ready) return;
+    const id = window.setTimeout(() => setTimedOut(true), SPAWN_GATE_TIMEOUT_MS);
+    return () => window.clearTimeout(id);
+  }, [ready]);
+  return ready || timedOut;
+}
+
 type IdxCap = { id: number; cap: Cap };
 
 function nearest(caps: readonly IdxCap[], dir: Vector3): number | undefined {
   return byDistance(caps, dir)[0];
 }
 
-/** One biome: model groups (mounted a few per frame), colliders and zones. */
+/**
+ * One biome: colliders and zones right away; model groups once every file of the biome is downloaded
+ * (so nothing suspends or pops in piecemeal), then a few groups per frame.
+ */
 function BiomeContent({ layout }: { layout: BiomeLayout }) {
+  const loaded = useLayoutLoaded(layout);
+  return (
+    <>
+      {loaded && <BiomeModels layout={layout} />}
+      <BiomeColliders layout={layout} />
+      <BiomeZones layout={layout} />
+    </>
+  );
+}
+
+/** Asks for the layout's files (promoting them if they were queued as background work). */
+function useLayoutLoaded(layout: BiomeLayout): boolean {
+  const [loaded, setLoaded] = useState(() => isLayoutLoaded(layout));
+  useEffect(() => {
+    if (loaded) return;
+    let live = true;
+    void loadLayout(layout, PRIORITY.near).then(() => {
+      if (live) setLoaded(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [layout, loaded]);
+  return loaded;
+}
+
+function BiomeModels({ layout }: { layout: BiomeLayout }) {
   const groups = useMemo(() => groupByModel([layout]), [layout]);
   const count = useStaggered(groups.length, GROUPS_PER_FRAME);
+  const biome = layout.biome;
+  const onReady = useCallback((ref: string) => markGroupReady(biome, ref), [biome]);
   return (
     <>
       {groups.slice(0, count).map((g) => (
         <ModelErrorBoundary
           key={g.ref}
           name={g.ref}
-          fallback={<Placeholders items={[...g.statics, ...g.dynamics]} />}
+          fallback={
+            <Placeholders items={[...g.statics, ...g.dynamics]} onMount={() => onReady(g.ref)} />
+          }
         >
-          {/* Its own boundary: a model still downloading must never blank the rest of the world */}
+          {/* Its own boundary: a model that still suspends must never blank the rest of the world */}
           <Suspense fallback={null}>
-            <ModelGroupView group={g} />
+            <ModelGroupView group={g} onReady={onReady} />
           </Suspense>
         </ModelErrorBoundary>
       ))}
-      <BiomeColliders layout={layout} />
-      <BiomeZones layout={layout} />
     </>
   );
 }
@@ -194,9 +200,13 @@ function useStaggered(total: number, perFrame: number): number {
   return Math.min(count, total);
 }
 
-/** All static colliders of a biome live in ONE fixed rigid body: far cheaper than one body each. */
+/**
+ * All static colliders of a biome live in ONE fixed rigid body: far cheaper than one body each.
+ * They are added a batch per frame so a biome streaming in never builds hundreds in one task.
+ */
 function BiomeColliders({ layout }: { layout: BiomeLayout }) {
   const boxes = useMemo(() => biomeColliderBoxes(layout), [layout]);
+  const count = useStaggered(boxes.length, COLLIDERS_PER_FRAME);
   if (boxes.length === 0) return null;
   return (
     <RigidBody
@@ -204,7 +214,7 @@ function BiomeColliders({ layout }: { layout: BiomeLayout }) {
       colliders={false}
       name={`colliders-${layout.biome}`}
     >
-      {boxes.map((b, i) => (
+      {boxes.slice(0, count).map((b, i) => (
         <CuboidCollider
           key={i}
           args={b.halfExtents}

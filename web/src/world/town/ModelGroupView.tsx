@@ -1,18 +1,20 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AnimationClip,
   AnimationMixer,
   BoxGeometry,
   Euler,
+  type Group,
   Matrix4,
   MeshStandardMaterial,
   TextureLoader,
   Vector3,
+  WebGLRenderTarget,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
@@ -21,6 +23,7 @@ import {
   type SkinnedMesh,
 } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { useAppStore } from "@/state/useAppStore";
 import type { KitInfo, ModelInfo } from "@/world/models/types";
 import { isGroundRef, localColliderBox, resolveCollider } from "@/world/lib/placement";
 import { placementPose, planetPlacementMatrix } from "@/world/lib/planetPlacement";
@@ -29,29 +32,35 @@ import type { ModelGroup, PlacedItem } from "./group";
 import { flatMaterial, paletteMaterial } from "./materials";
 import { extractPrimitives, type Primitive } from "./primitives";
 
-/** Renders every placement of one model: static ones instanced, dynamic ones as rigid bodies. */
-export function ModelGroupView({ group }: { group: ModelGroup }) {
+/**
+ * Renders every placement of one model: static ones instanced, dynamic ones as rigid bodies.
+ * `onReady(ref)` fires once the group is on screen (shaders compiled), or shows a placeholder.
+ */
+export function ModelGroupView({ group, onReady }: { group: ModelGroup; onReady?: OnReady }) {
   const info = lookupModel(group.ref);
   if (!info) {
     warnOnce(group.ref, `model "${group.ref}" is not in the manifest; rendering a placeholder`);
-    return <Placeholders items={[...group.statics, ...group.dynamics]} />;
+    return <Placeholders items={[...group.statics, ...group.dynamics]} onMount={() => onReady?.(group.ref)} />;
   }
   const kit = lookupKit(info.kit);
   if (!kit) warnOnce(`kit:${info.kit}`, `kit "${info.kit}" is not in the manifest; using scale 1`);
   return kit?.texture ? (
-    <TexturedModel group={group} info={info} kit={kit} texture={kit.texture} />
+    <TexturedModel group={group} info={info} kit={kit} texture={kit.texture} onReady={onReady} />
   ) : (
-    <FlatModel group={group} info={info} kit={kit} />
+    <FlatModel group={group} info={info} kit={kit} onReady={onReady} />
   );
 }
+
+type OnReady = (ref: string) => void;
 
 interface ModelProps {
   group: ModelGroup;
   info: ModelInfo;
   kit: KitInfo | undefined;
+  onReady?: OnReady;
 }
 
-function TexturedModel({ group, info, kit, texture }: ModelProps & { texture: string }) {
+function TexturedModel({ group, info, kit, texture, onReady }: ModelProps & { texture: string }) {
   const gltf = useGLTF(info.url, false);
   const map = useLoader(TextureLoader, texture);
   const resolve = useMemo<ResolveMaterial>(() => {
@@ -59,13 +68,17 @@ function TexturedModel({ group, info, kit, texture }: ModelProps & { texture: st
     // Primitives without UVs can't sample the palette: keep their own flat colour
     return (material, geometry) => (geometry.attributes.uv ? palette : flatMaterial(info.kit, material));
   }, [map, texture, info.kit]);
-  return <ModelBody group={group} info={info} kitScale={kit?.scale ?? 1} gltf={gltf} resolve={resolve} />;
+  return (
+    <ModelBody group={group} info={info} kitScale={kit?.scale ?? 1} gltf={gltf} resolve={resolve} onReady={onReady} />
+  );
 }
 
-function FlatModel({ group, info, kit }: ModelProps) {
+function FlatModel({ group, info, kit, onReady }: ModelProps) {
   const gltf = useGLTF(info.url, false);
   const resolve = useMemo<ResolveMaterial>(() => (material) => flatMaterial(info.kit, material), [info.kit]);
-  return <ModelBody group={group} info={info} kitScale={kit?.scale ?? 1} gltf={gltf} resolve={resolve} />;
+  return (
+    <ModelBody group={group} info={info} kitScale={kit?.scale ?? 1} gltf={gltf} resolve={resolve} onReady={onReady} />
+  );
 }
 
 /** The parts of a loaded glTF we use (drei and three ship slightly different GLTF typings) */
@@ -82,13 +95,17 @@ function ModelBody({
   kitScale,
   gltf,
   resolve,
+  onReady,
 }: {
   group: ModelGroup;
   info: ModelInfo;
   kitScale: number;
   gltf: GLTF;
   resolve: ResolveMaterial;
+  onReady?: OnReady;
 }) {
+  const root = useRef<Group>(null);
+  const warm = useWarmShaders(root, () => onReady?.(group.ref));
   const prims = useMemo(
     () => extractPrimitives(gltf.scene).map((p) => ({ ...p, material: resolve(p.material, p.geometry) })),
     [gltf.scene, resolve],
@@ -104,15 +121,16 @@ function ModelBody({
   if (skinned) {
     // Skinned characters can't share an InstancedMesh: each placement gets its own skeleton clone
     return (
-      <>
+      <group ref={root} visible={warm}>
         {[...group.statics, ...group.dynamics].map((item, i) => (
           <SkinnedClone key={i} item={item} gltf={gltf} kitScale={kitScale} resolve={resolve} />
         ))}
-      </>
+      </group>
     );
   }
+  // Hidden until its shaders are compiled (see useWarmShaders): the group's colliders don't depend on it
   return (
-    <>
+    <group ref={root} visible={warm}>
       {group.statics.length > 0 &&
         prims.map((prim, i) => (
           <InstancedPrimitive
@@ -125,8 +143,54 @@ function ModelBody({
       {group.dynamics.map((item, i) => (
         <DynamicProp key={i} item={item} info={info} kitScale={kitScale} prims={prims} />
       ))}
-    </>
+    </group>
   );
+}
+
+/**
+ * Compile the subtree's materials before it is ever drawn. `compileAsync` uses KHR_parallel_shader_compile
+ * where available, so a new shader variant compiles off the main thread instead of stalling the first
+ * frame that draws it (the biggest load-time spike after context creation). Materials are shared, so
+ * after the first few groups this resolves immediately. Returns whether the subtree may be shown.
+ */
+function useWarmShaders(root: { current: Object3D | null }, onWarm: () => void): boolean {
+  const get = useThree((s) => s.get);
+  const [warm, setWarm] = useState(false);
+  const onWarmRef = useRef(onWarm);
+  useLayoutEffect(() => {
+    onWarmRef.current = onWarm;
+  });
+  useLayoutEffect(() => {
+    const obj = root.current;
+    if (!obj) return;
+    let live = true;
+    const { gl, camera, scene } = get();
+    // compile() gathers materials with traverse() (invisible objects included) and lights from `scene`.
+    // Programs also depend on whether a render target is bound (output colour space, tone mapping):
+    // with PSX on the scene pass draws into PSX's low-res target, so compile against a target too, or
+    // we'd warm a variant the real frame never uses.
+    const prevTarget = gl.getRenderTarget();
+    gl.setRenderTarget(useAppStore.getState().psx ? compileTarget() : null);
+    let compiling: Promise<unknown>;
+    try {
+      compiling = gl.compileAsync(obj, camera, scene);
+    } catch {
+      compiling = Promise.resolve();
+    } finally {
+      gl.setRenderTarget(prevTarget);
+    }
+    compiling
+      .catch(() => {})
+      .then(() => {
+        if (!live) return;
+        setWarm(true);
+        onWarmRef.current();
+      });
+    return () => {
+      live = false;
+    };
+  }, [get, root]);
+  return warm;
 }
 
 function InstancedPrimitive({
@@ -224,6 +288,12 @@ function hasSkinnedMesh(root: Object3D): boolean {
   return found;
 }
 
+let sharedCompileTarget: WebGLRenderTarget | undefined;
+/** Any non-XR target gives the same program variant as PSX's scene target; 1x1 is enough. */
+function compileTarget(): WebGLRenderTarget {
+  return (sharedCompileTarget ??= new WebGLRenderTarget(1, 1));
+}
+
 /** Default animation for skinned characters (Kenney mini-characters ship "idle"); placement.anim overrides. */
 const CHARACTER_CLIP = "idle";
 /** Metres a dynamic prop starts above its resting point */
@@ -277,8 +347,12 @@ const placeholderGeometry = new BoxGeometry(2, 2, 2).translate(0, 1, 0);
 const placeholderMaterial: Material = new MeshStandardMaterial({ color: "#ff3fa4", roughness: 1 });
 
 /** Magenta boxes where a model is missing, so authoring mistakes are obvious but harmless. */
-export function Placeholders({ items }: { items: PlacedItem[] }) {
+export function Placeholders({ items, onMount }: { items: PlacedItem[]; onMount?: () => void }) {
   const ref = useRef<InstancedMesh>(null);
+  const onMountRef = useRef(onMount);
+  useEffect(() => {
+    onMountRef.current?.();
+  }, []);
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;

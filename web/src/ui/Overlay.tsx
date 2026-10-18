@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { Component, useState, type ReactNode } from "react";
 import { links } from "@/content";
 import type { DistrictId } from "@/content/types";
 import { useAppStore } from "@/state/useAppStore";
@@ -13,6 +13,7 @@ import TrackedLink from "./TrackedLink";
 import { cardTitle, resolveCard } from "./cards/resolveCard";
 import { useIsCoarsePointer, usePrefersReducedMotion, useWebGL2 } from "./lib/hooks";
 import styles from "./AppShell.module.css";
+import local from "./Overlay.module.css";
 
 // Client-only and code-split: the bar is useless before JS anyway, and this keeps three.js'
 // loading manager out of the critical path of the server-rendered text.
@@ -20,20 +21,28 @@ const Loader = dynamic(() => import("./Loader"), { ssr: false });
 
 /** The 3D canvas (or the no-WebGL fallback) plus every interactive overlay layer. */
 export default function Overlay({ district }: { district: DistrictId }) {
-  const webgl = useWebGL2();
+  const detected = useWebGL2();
+  // The probe can pass while the real context still fails (GPU blocklist, too many contexts, driver
+  // reset): R3F rethrows that from <Canvas>, and we fall back exactly as if WebGL2 were missing.
+  const [crashed, setCrashed] = useState(false);
+  const webgl = crashed ? false : detected;
 
   return (
     <>
       {webgl === true && (
         <div className={styles.world}>
-          <WorldLoader district={district} />
+          <WorldBoundary onError={() => setCrashed(true)}>
+            <WorldLoader district={district} />
+          </WorldBoundary>
         </div>
       )}
       {webgl === false && <NoWebGL />}
+      {/* Server-rendered (webgl is null until hydration): the controls hint is real text the browser
+          paints with the first frame instead of after the WebGL probe and 3D bundle kick in. */}
+      {webgl !== false && <BottomStack />}
       {webgl === true && (
         <>
           <Loader />
-          <BottomStack />
           <InteractionPrompt />
           <TouchControls />
           <GpsMenu />
@@ -43,6 +52,24 @@ export default function Overlay({ district }: { district: DistrictId }) {
       <InfoCard />
     </>
   );
+}
+
+/** Catches a failed WebGL context (or any crash inside the 3D world) and reports it once. */
+class WorldBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn("[world] the 3D world failed to start; showing the fallback", error);
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }
 
 function NoWebGL() {
@@ -72,7 +99,6 @@ function NoWebGL() {
 /** Bottom-left stack: reduced-motion suggestion + the controls hint. */
 function BottomStack() {
   const mode = useAppStore((s) => s.mode);
-  const coarse = useIsCoarsePointer();
   const reducedMotion = usePrefersReducedMotion();
   const [dismissed, setDismissed] = useState(false);
   const hintHidden = mode !== "intro";
@@ -96,33 +122,31 @@ function BottomStack() {
         </div>
       )}
       <div className={styles.hint} data-hidden={hintHidden} aria-hidden={hintHidden}>
-        {coarse ? (
-          <p className={styles.hintLine}>
-            <strong>Drag the stick</strong> to drive · hold <strong>■</strong> to brake · tap <Key>E</Key> at a
-            sign
-          </p>
-        ) : (
-          <ul className={styles.hintList}>
-            <li>
-              <Key>W</Key>
-              <Key>A</Key>
-              <Key>S</Key>
-              <Key>D</Key> / arrows drive
-            </li>
-            <li>
-              <Key wide>Space</Key> brake
-            </li>
-            <li>
-              <Key>E</Key> open
-            </li>
-            <li>
-              <Key>R</Key> reset
-            </li>
-            <li>
-              <Key>M</Key> map
-            </li>
-          </ul>
-        )}
+        {/* Both variants are in the HTML and a CSS (pointer: coarse) query picks one, so the hint
+            never swaps after hydration (it is often the page's largest text, i.e. its LCP). */}
+        <p className={`${styles.hintLine} ${local.coarseOnly}`}>
+          <strong>Drag the stick</strong> to drive · hold <strong>■</strong> to brake · tap <Key>E</Key> at a sign
+        </p>
+        <ul className={`${styles.hintList} ${local.fineOnly}`}>
+          <li>
+            <Key>W</Key>
+            <Key>A</Key>
+            <Key>S</Key>
+            <Key>D</Key> / arrows drive
+          </li>
+          <li>
+            <Key wide>Space</Key> brake
+          </li>
+          <li>
+            <Key>E</Key> open
+          </li>
+          <li>
+            <Key>R</Key> reset
+          </li>
+          <li>
+            <Key>M</Key> map
+          </li>
+        </ul>
       </div>
     </div>
   );
