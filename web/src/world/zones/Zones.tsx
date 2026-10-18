@@ -14,7 +14,8 @@ import { vehicleState } from "@/world/vehicle/vehicleState";
 import { ZONE_HEIGHT, ZONE_SIZE, markerLabel } from "./markers";
 
 /** Optional local font for labels. Without one, troika loads its default font from a CDN. */
-const LABEL_FONT: string | undefined = "/fonts/kenney-future.ttf"; // Kenney Future, CC0 (kenney.nl), served locally
+// Kenney Mini Square Mono (CC0, kenney.nl), served locally: the only Kenney font whose "K" does not read as "H"
+const LABEL_FONT: string | undefined = "/fonts/kenney-mini-square-mono.ttf";
 const LABEL_HEIGHT = 5.2;
 
 // Perspective already shrinks distant labels, so they keep full size far away and only shrink as
