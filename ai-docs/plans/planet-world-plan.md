@@ -39,7 +39,7 @@ Turn the flat Kenney town into a **small drivable planet**: a tiny globe you can
 | Dirt canyon raceway | raceway | — |
 | Badlands | none | pure off-road, no markers |
 
-- **Vehicle:** stays `car-kit/sedan-sports`, with raised suspension. A Kenney SUV is a later option.
+- **Vehicle:** `car-kit/suv` (Ariann, 2026-10-17). The spare-tyre node `wheel-back` is static, and the four `wheel-*-left/right` nodes are driven.
 - **PSX is on by default,** and the quality menu turns it off. `prefers-reduced-motion` disables camera shake.
 
 ## Workstreams (v2)
@@ -100,4 +100,4 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 
 ## Open questions
 1. Ship v1 (the flat town) **now** for the launch while v2 is built, or wait for v2?
-2. Sedan or an off-road vehicle (Kenney `suv` / `tractor`) for v2?
+2. ~~Vehicle~~ **Answered:** SUV.
