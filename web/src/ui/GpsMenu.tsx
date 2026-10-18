@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { districts } from "@/content";
 import { useAppStore } from "@/state/useAppStore";
+import { BIOMES } from "@/world/planet/biomes";
 import Modal, { CloseButton } from "./Modal";
 import TrackedLink from "./TrackedLink";
 import styles from "./GpsMenu.module.css";
@@ -21,8 +22,8 @@ function GpsDialog() {
   const visited = useAppStore((s) => s.visitedDistricts);
   const close = () => setGpsOpen(false);
 
-  // Built districts first, then the "coming soon" plots.
-  const sorted = [...districts].sort((a, b) => a.milestone - b.milestone);
+  // Every career district is a biome on the planet now: all reachable, in content order.
+  const themes = new Map(BIOMES.map((b) => [b.district, b.theme]));
 
   return (
     <Modal labelledBy={headingId} onClose={close} placement="center">
@@ -35,20 +36,19 @@ function GpsDialog() {
           </h2>
         </header>
         <ul className={styles.list}>
-          {sorted.map((d) => {
-            const built = d.milestone === 1;
+          {districts.map((d) => {
             const wasVisited = visited.includes(d.id);
+            const theme = themes.get(d.id);
             return (
               <li key={d.id}>
                 <button
                   type="button"
                   className={styles.item}
-                  disabled={!built}
                   onClick={() => teleportTo(d.id)}
                   aria-describedby={`${headingId}-${d.id}`}
                 >
                   <span className={styles.pin} aria-hidden="true">
-                    {built ? "📍" : "🚧"}
+                    📍
                   </span>
                   <span className={styles.text}>
                     <span className={styles.name}>
@@ -56,8 +56,9 @@ function GpsDialog() {
                       {wasVisited && <span className={styles.visited}>✓ Visited</span>}
                     </span>
                     <span id={`${headingId}-${d.id}`} className={styles.blurb}>
-                      {built ? d.blurb : "Under construction · coming soon"}
+                      {d.blurb}
                     </span>
+                    {theme && <span className={styles.theme}>{theme}</span>}
                   </span>
                 </button>
               </li>

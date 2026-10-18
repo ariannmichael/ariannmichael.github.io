@@ -1,12 +1,10 @@
-// Group every placement of every district by model, split into instanced (static) and dynamic bodies.
-import type { DistrictId } from "@/content/types";
-import type { DistrictLayout, ModelRef, Placement } from "@/world/layout/types";
-import type { TileOrigin } from "@/world/lib/placement";
+// Group a biome's placements by model, split into instanced (static) and dynamic bodies.
+import type { ModelRef } from "@/world/layout/types";
+import type { BiomeId, BiomeLayout, PlanetPlacement } from "@/world/planet/types";
 
 export interface PlacedItem {
-  district: DistrictId;
-  origin: TileOrigin;
-  placement: Placement;
+  biome: BiomeId;
+  placement: PlanetPlacement;
 }
 
 export interface ModelGroup {
@@ -17,7 +15,7 @@ export interface ModelGroup {
   dynamics: PlacedItem[];
 }
 
-export function groupByModel(layouts: readonly DistrictLayout[]): ModelGroup[] {
+export function groupByModel(layouts: readonly BiomeLayout[]): ModelGroup[] {
   const groups = new Map<ModelRef, ModelGroup>();
   for (const layout of layouts) {
     for (const placement of layout.placements) {
@@ -26,7 +24,7 @@ export function groupByModel(layouts: readonly DistrictLayout[]): ModelGroup[] {
         g = { ref: placement.model, statics: [], dynamics: [] };
         groups.set(placement.model, g);
       }
-      const item = { district: layout.id, origin: layout.origin, placement };
+      const item = { biome: layout.biome, placement };
       (placement.body === "dynamic" ? g.dynamics : g.statics).push(item);
     }
   }

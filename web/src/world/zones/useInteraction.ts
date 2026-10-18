@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/state/useAppStore";
 import { useInputStore } from "@/state/useInputStore";
 import { GPS_KEYS, INTERACT_KEYS } from "@/world/controls";
-import type { DistrictLayout } from "@/world/layout/types";
+import type { BiomeLayout } from "@/world/planet/types";
 import { indexMarkers, interactAction, zoneKey } from "./markers";
 
 /** Keys typed into the overlay (buttons, inputs, dialogs) must not drive the world. */
@@ -28,7 +28,7 @@ function downloadFile(url: string): void {
  * Interact (E / Enter / on-screen button): open the active zone's card, or download the CV for a
  * `cv` marker. GPS (M / G): toggle the GPS menu.
  */
-export function useInteraction(layouts: readonly DistrictLayout[]): void {
+export function useInteraction(layouts: readonly BiomeLayout[]): void {
   useEffect(() => {
     const markers = indexMarkers(layouts);
 

@@ -109,6 +109,13 @@
   color: var(--text-muted);
 }
 
+/* The biome's look, so you know what you'll be driving into */
+.theme {
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 .plain {
   align-self: flex-start;
   font-weight: 600;

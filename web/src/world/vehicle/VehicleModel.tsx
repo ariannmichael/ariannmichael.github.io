@@ -6,19 +6,16 @@ import { useLayoutEffect, useMemo } from "react";
 import { TextureLoader, type Material, type Mesh, type Object3D } from "three";
 import { warnOnce } from "@/world/lib/models";
 import { flatMaterial, paletteMaterial } from "@/world/town/materials";
-import { SEDAN_NODES } from "./constants";
+import { VEHICLE_WHEEL_NODES } from "./constants";
 
-/** Animated nodes of the car, filled in once the model is mounted. */
-export interface SedanNodes {
-  body: Object3D | null;
-  /** Base local Y of the body node, so the bounce is an offset from it */
-  bodyBaseY: number;
-  wheelsFront: Object3D[];
-  wheelsBack: Object3D[];
+/** Wheel nodes of the car model (controller order: FL, FR, BL, BR), filled in once mounted. */
+export interface VehicleNodes {
+  /** null where the node is missing; that wheel just doesn't animate */
+  wheels: (Object3D | null)[];
 }
 
-export function emptySedanNodes(): SedanNodes {
-  return { body: null, bodyBaseY: 0, wheelsFront: [], wheelsBack: [] };
+export function emptyVehicleNodes(): VehicleNodes {
+  return { wheels: [] };
 }
 
 interface Props {
@@ -26,21 +23,22 @@ interface Props {
   kit: string;
   texture: string | null;
   /** Called with the animated nodes once mounted (and with empty nodes on unmount) */
-  onNodes: (nodes: SedanNodes) => void;
+  onNodes: (nodes: VehicleNodes) => void;
 }
 
-export function SedanModel(props: Props) {
-  return props.texture ? <TexturedSedan {...props} texture={props.texture} /> : <Sedan {...props} material={null} />;
+/** A Kenney car-kit vehicle with its four road wheels exposed for animation. */
+export function VehicleModel(props: Props) {
+  return props.texture ? <TexturedVehicle {...props} texture={props.texture} /> : <Car {...props} material={null} />;
 }
 
-function TexturedSedan(props: Props & { texture: string }) {
+function TexturedVehicle(props: Props & { texture: string }) {
   const map = useLoader(TextureLoader, props.texture);
-  return <Sedan {...props} material={paletteMaterial(props.texture, map)} />;
+  return <Car {...props} material={paletteMaterial(props.texture, map)} />;
 }
 
-function Sedan({ url, kit, onNodes, material }: Props & { material: Material | null }) {
+function Car({ url, kit, onNodes, material }: Props & { material: Material | null }) {
   const { scene } = useGLTF(url, false);
-  // Own copy: we rotate wheel nodes every frame and must not disturb the cached glTF scene
+  // Own copy: we move and rotate wheel nodes every frame and must not disturb the cached glTF scene
   const model = useMemo(() => scene.clone(true), [scene]);
 
   useLayoutEffect(() => {
@@ -53,39 +51,30 @@ function Sedan({ url, kit, onNodes, material }: Props & { material: Material | n
       mesh.receiveShadow = true;
     });
 
-    const find = (name: string) => {
+    const wheels = VEHICLE_WHEEL_NODES.map((name) => {
       const node = model.getObjectByName(name) ?? null;
-      if (!node) warnOnce(`sedan:${name}`, `sedan node "${name}" not found; that part won't animate`);
-      return node;
-    };
-    const body = find(SEDAN_NODES.body);
-    const wheels = [SEDAN_NODES.wheelFL, SEDAN_NODES.wheelFR, SEDAN_NODES.wheelBL, SEDAN_NODES.wheelBR].map(find);
-    for (const w of wheels) {
+      if (!node) warnOnce(`vehicle:${name}`, `vehicle node "${name}" not found; that wheel won't animate`);
       // Steer (Y) is applied in the parent frame, spin (X) in the wheel's own frame: R = Ry * Rx
-      if (w) w.rotation.order = "YXZ";
-    }
-    onNodes({
-      body,
-      bodyBaseY: body?.position.y ?? 0,
-      wheelsFront: wheels.slice(0, 2).filter((w): w is Object3D => !!w),
-      wheelsBack: wheels.slice(2).filter((w): w is Object3D => !!w),
+      if (node) node.rotation.order = "YXZ";
+      return node;
     });
-    return () => onNodes(emptySedanNodes());
+    onNodes({ wheels });
+    return () => onNodes(emptyVehicleNodes());
   }, [model, material, kit, onNodes]);
 
   return <primitive object={model} />;
 }
 
-/** Stand-in car when the sedan model is missing: still drivable, obviously a placeholder. */
+/** Stand-in car when the model is missing: still drivable, obviously a placeholder. */
 export function BoxCar() {
   return (
     <group>
-      <mesh position={[0, 0.55, 0]} castShadow>
-        <boxGeometry args={[1.8, 0.7, 3.6]} />
+      <mesh position={[0, 0.9, 0]} castShadow>
+        <boxGeometry args={[2.2, 0.9, 4.2]} />
         <meshStandardMaterial color="#e8483b" roughness={0.6} />
       </mesh>
-      <mesh position={[0, 1.05, -0.3]} castShadow>
-        <boxGeometry args={[1.5, 0.5, 1.8]} />
+      <mesh position={[0, 1.6, -0.3]} castShadow>
+        <boxGeometry args={[1.9, 0.6, 2.4]} />
         <meshStandardMaterial color="#2b2d42" roughness={0.4} />
       </mesh>
     </group>

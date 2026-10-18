@@ -5,14 +5,31 @@ import { useRef } from "react";
 import { Vector3, type PerspectiveCamera } from "three";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAppStore } from "@/state/useAppStore";
-import { clamp, damp, dampFactor, smoothstep } from "@/world/lib/damping";
+import { damp, dampFactor, smoothstep } from "@/world/lib/damping";
 import { VEHICLE } from "@/world/vehicle/constants";
 import { vehicleState } from "@/world/vehicle/vehicleState";
-import { CAMERA, followFov, followLookAt, followPosition, orbitPosition } from "./cameraMath";
+import {
+  CAMERA,
+  clampAboveTerrain,
+  followFov,
+  followLookAt,
+  followPosition,
+  liftForLineOfSight,
+  orbitPosition,
+  projectToTangent,
+} from "./cameraMath";
+import { SHAKE, decayTrauma, rumbleAmount, shakeAmount, shakeOffsets, shakeState, type ShakeOffsets } from "./shake";
+
+/** Seconds after a teleport during which the camera keeps snapping (covers the interpolation frame) */
+const SNAP_WINDOW = 0.15;
 
 /**
- * Intro: slow orbit around the car's spawn. Drive/card: third-person follow with frame-rate
- * independent damping. The switch blends smoothly (damping ramps up over CAMERA.introBlend).
+ * Planet camera. Intro: a slow, high orbit around the spawn that shows the planet's curve.
+ * Drive/card: third-person follow whose up is the local planet up at the car, damped, kept above the
+ * terrain and lifted when a hill blocks the view, with a speed FOV and trauma-based shake
+ * (`addTrauma` in ./shake). Shake is off with prefers-reduced-motion and halved in "low" quality.
+ *
+ * No props. Mount anywhere inside the <Canvas> (it doesn't need <Physics>); it reads `vehicleState`.
  */
 export function FollowCamera() {
   const reduced = usePrefersReducedMotion();
@@ -20,8 +37,13 @@ export function FollowCamera() {
   const cam = useRef({
     pos: new Vector3(),
     look: new Vector3(),
+    up: new Vector3(0, 1, 0),
+    heading: new Vector3(0, 0, 1),
     wantPos: new Vector3(),
     wantLook: new Vector3(),
+    right: new Vector3(),
+    camUp: new Vector3(),
+    shake: { x: 0, y: 0, roll: 0, yaw: 0, pitch: 0 } as ShakeOffsets,
     orbitAngle: -Math.PI / 2,
     blend: 0,
     teleportSeen: -1,
@@ -35,21 +57,35 @@ export function FollowCamera() {
     // The default camera is a PerspectiveCamera (Canvas `camera` prop)
     const camera = state.camera as PerspectiveCamera;
     const v = vehicleState;
-    const mode = useAppStore.getState().mode;
+    const { mode, quality } = useAppStore.getState();
+    const justTeleported = performance.now() / 1000 - v.teleportedAt < SNAP_WINDOW;
+    const snap = !c.initialized || c.teleportSeen !== v.teleportCount || justTeleported;
 
-    followPosition(v.position, v.yaw, v.forwardSpeed, c.wantPos);
-    followLookAt(v.position, v.yaw, v.forwardSpeed, c.wantLook);
+    // Smoothed local frame: up follows the planet normal at the car, heading the car's nose
+    if (snap) {
+      c.up.copy(v.up);
+      c.heading.copy(v.heading);
+    } else {
+      c.up.lerp(v.up, dampFactor(CAMERA.upLambda, dt)).normalize();
+      c.heading.lerp(v.heading, dampFactor(CAMERA.headingLambda, dt));
+    }
+    projectToTangent(c.heading, c.up, v.heading);
+
+    followPosition(v.position, c.up, c.heading, v.forwardSpeed, c.wantPos);
+    followLookAt(v.position, c.up, c.heading, v.forwardSpeed, c.wantLook);
+    clampAboveTerrain(c.wantPos, CAMERA.minClearance);
+    liftForLineOfSight(c.wantLook, c.wantPos, CAMERA.losClearance);
 
     if (mode === "intro") {
       c.orbitAngle += (reduced ? CAMERA.orbitSpeedReduced : CAMERA.orbitSpeed) * dt;
-      orbitPosition(v.ground, c.orbitAngle, c.pos);
-      c.look.copy(v.ground);
+      orbitPosition(v.ground, v.up, c.orbitAngle, c.pos);
+      c.look.copy(v.position);
       c.blend = 0;
       c.initialized = true;
       c.teleportSeen = v.teleportCount;
     } else {
-      // Snap on first frame and after teleports (the fade hides the cut)
-      if (!c.initialized || c.teleportSeen !== v.teleportCount) {
+      // Snap on the first frame and after teleports (the fade hides the cut)
+      if (snap) {
         c.pos.copy(c.wantPos);
         c.look.copy(c.wantLook);
         c.teleportSeen = v.teleportCount;
@@ -57,25 +93,38 @@ export function FollowCamera() {
         c.blend = 1;
       }
       c.blend = Math.min(1, c.blend + dt / CAMERA.introBlend);
-      // Slow at first so the fly-down from the orbit is gentle, then the normal follow rate
-      const ramp = 0.15 + 0.85 * smoothstep(c.blend);
+      // Slow at first so the descent from the orbit is gentle, then the normal follow rate
+      const ramp = 0.12 + 0.88 * smoothstep(c.blend);
       c.pos.lerp(c.wantPos, dampFactor(CAMERA.positionLambda * ramp, dt));
       c.look.lerp(c.wantLook, dampFactor(CAMERA.lookLambda * ramp, dt));
+      // The damped position can lag into a hillside: hard-clamp it too
+      clampAboveTerrain(c.pos, CAMERA.minClearance);
     }
 
     camera.position.copy(c.pos);
+    // During the intro blend, the up vector eases from the orbit's to the car's (same here: both local)
+    camera.up.copy(c.up);
+    camera.lookAt(c.look);
 
-    // A faint rumble near top speed; never with reduced motion
-    if (!reduced && mode === "drive") {
-      const ratio = Math.abs(v.forwardSpeed) / VEHICLE.maxSpeed;
-      const amp = CAMERA.shake * clamp((ratio - 0.7) / 0.3, 0, 1);
-      if (amp > 0) {
-        const t = state.clock.elapsedTime;
-        camera.position.x += Math.sin(t * 41) * amp;
-        camera.position.y += Math.sin(t * 57 + 1.3) * amp * 0.6;
+    // --- Shake: trauma² + speed rumble, noise-driven, applied in camera space ---
+    shakeState.trauma = decayTrauma(shakeState.trauma, dt);
+    if (reduced) {
+      shakeState.trauma = 0;
+    } else if (mode !== "intro") {
+      const speedRatio = Math.abs(v.forwardSpeed) / VEHICLE.maxSpeed;
+      const rumble = v.grounded ? rumbleAmount(speedRatio, v.suspensionActivity) : 0;
+      const amount = shakeAmount(shakeState.trauma, rumble);
+      if (amount > 0.0005) {
+        const scale = quality === "low" ? SHAKE.lowQualityScale : 1;
+        const o = shakeOffsets(amount, state.clock.elapsedTime, c.shake, scale);
+        c.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        c.camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(c.right, o.x).addScaledVector(c.camUp, o.y);
+        camera.rotateZ(o.roll);
+        camera.rotateY(o.yaw);
+        camera.rotateX(o.pitch);
       }
     }
-    camera.lookAt(c.look);
 
     const targetFov = mode === "intro" ? CAMERA.fov : followFov(v.forwardSpeed);
     const fov = damp(c.fov, targetFov, 3, dt);

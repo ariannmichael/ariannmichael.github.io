@@ -8,9 +8,11 @@ import {
   AnimationClip,
   AnimationMixer,
   BoxGeometry,
+  Euler,
   Matrix4,
   MeshStandardMaterial,
   TextureLoader,
+  Vector3,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
@@ -20,7 +22,8 @@ import {
 } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { KitInfo, ModelInfo } from "@/world/models/types";
-import { isGroundRef, localColliderBox, placementMatrix, placementPosition, resolveCollider, rotToYaw } from "@/world/lib/placement";
+import { isGroundRef, localColliderBox, resolveCollider } from "@/world/lib/placement";
+import { placementPose, planetPlacementMatrix } from "@/world/lib/planetPlacement";
 import { lookupKit, lookupModel, warnOnce } from "@/world/lib/models";
 import type { ModelGroup, PlacedItem } from "./group";
 import { flatMaterial, paletteMaterial } from "./materials";
@@ -92,7 +95,12 @@ function ModelBody({
   );
   const skinned = useMemo(() => hasSkinnedMesh(gltf.scene), [gltf.scene]);
   // Flat ground pieces don't cast shadows (saves shadow-map draw calls and avoids acne on roads)
-  const casts = !isGroundRef(group.ref) && resolveCollider({ model: group.ref, x: 0, z: 0 }, info) === "box";
+  const casts = !isGroundRef(group.ref) && resolveCollider({ model: group.ref }, info) === "box";
+  // Surface poses sample the terrain: compute each placement's matrix once, share it across primitives
+  const itemMatrices = useMemo(
+    () => group.statics.map((it) => planetPlacementMatrix(it.placement, kitScale)),
+    [group.statics, kitScale],
+  );
   if (skinned) {
     // Skinned characters can't share an InstancedMesh: each placement gets its own skeleton clone
     return (
@@ -110,8 +118,7 @@ function ModelBody({
           <InstancedPrimitive
             key={`${i}-${group.statics.length}`}
             prim={prim}
-            items={group.statics}
-            kitScale={kitScale}
+            itemMatrices={itemMatrices}
             castShadow={casts}
           />
         ))}
@@ -124,13 +131,11 @@ function ModelBody({
 
 function InstancedPrimitive({
   prim,
-  items,
-  kitScale,
+  itemMatrices,
   castShadow,
 }: {
   prim: Primitive;
-  items: PlacedItem[];
-  kitScale: number;
+  itemMatrices: Matrix4[];
   castShadow: boolean;
 }) {
   const ref = useRef<InstancedMesh>(null);
@@ -138,20 +143,19 @@ function InstancedPrimitive({
     const mesh = ref.current;
     if (!mesh) return;
     const m = new Matrix4();
-    items.forEach((it, i) => {
-      // instance = placement transform * node transform inside the model
-      placementMatrix(it.origin, it.placement, kitScale, m).multiply(prim.matrix);
-      mesh.setMatrixAt(i, m);
+    itemMatrices.forEach((placed, i) => {
+      // instance = placement transform (surface pose x scale) * node transform inside the model
+      mesh.setMatrixAt(i, m.multiplyMatrices(placed, prim.matrix));
     });
     mesh.instanceMatrix.needsUpdate = true;
     // Bounds over all instances so frustum culling works for the whole batch
     mesh.computeBoundingBox();
     mesh.computeBoundingSphere();
-  }, [items, kitScale, prim]);
+  }, [itemMatrices, prim]);
   return (
     <instancedMesh
       ref={ref}
-      args={[prim.geometry, prim.material, items.length]}
+      args={[prim.geometry, prim.material, itemMatrices.length]}
       castShadow={castShadow}
       receiveShadow
     />
@@ -170,9 +174,19 @@ function DynamicProp({
   kitScale: number;
   prims: Primitive[];
 }) {
-  const { placement, origin } = item;
+  const { placement } = item;
   const s = placement.scale ?? 1;
-  const position = placementPosition(origin, placement);
+  const pose = placementPose(placement);
+  // Spawn a hair above the ground so the prop settles under PlanetGravity instead of starting in contact
+  const { position, rotation } = useMemo(() => {
+    const up = new Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
+    const p = pose.position.clone().addScaledVector(up, DYNAMIC_DROP);
+    const e = new Euler().setFromQuaternion(pose.quaternion);
+    return {
+      position: [p.x, p.y, p.z] as [number, number, number],
+      rotation: [e.x, e.y, e.z] as [number, number, number],
+    };
+  }, [pose]);
   const box = localColliderBox(info, s);
   const matrices = useMemo(() => {
     const scale = new Matrix4().makeScale(kitScale * s, kitScale * s, kitScale * s);
@@ -183,7 +197,8 @@ function DynamicProp({
       type="dynamic"
       colliders={false}
       position={position}
-      rotation={[0, rotToYaw(placement.rot), 0]}
+      rotation={rotation}
+      canSleep
     >
       <CuboidCollider args={box.halfExtents} position={box.center} density={0.6} friction={0.8} />
       {prims.map((p, i) => (
@@ -209,8 +224,10 @@ function hasSkinnedMesh(root: Object3D): boolean {
   return found;
 }
 
-/** Animation played by skinned characters (Kenney mini-characters ship "idle"). */
+/** Default animation for skinned characters (Kenney mini-characters ship "idle"); placement.anim overrides. */
 const CHARACTER_CLIP = "idle";
+/** Metres a dynamic prop starts above its resting point */
+const DYNAMIC_DROP = 0.05;
 
 function SkinnedClone({
   item,
@@ -233,14 +250,15 @@ function SkinnedClone({
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
-    placementMatrix(item.origin, item.placement, kitScale, clone.matrix);
+    planetPlacementMatrix(item.placement, kitScale, clone.matrix);
     clone.matrix.decompose(clone.position, clone.quaternion, clone.scale);
     return clone;
   }, [gltf.scene, item, kitScale, resolve]);
 
   const mixer = useMemo(() => new AnimationMixer(object), [object]);
+  const clipName = item.placement.anim ?? CHARACTER_CLIP;
   useEffect(() => {
-    const clip = AnimationClip.findByName(gltf.animations, CHARACTER_CLIP);
+    const clip = AnimationClip.findByName(gltf.animations, clipName);
     if (!clip) return;
     const action = mixer.clipAction(clip).play();
     // Random phase so a crowd doesn't move in lockstep
@@ -248,12 +266,13 @@ function SkinnedClone({
     return () => {
       mixer.stopAllAction();
     };
-  }, [mixer, gltf.animations]);
+  }, [mixer, gltf.animations, clipName]);
   useFrame((_, dt) => mixer.update(Math.min(dt, 0.1)));
 
   return <primitive object={object} />;
 }
 
+const ONE = new Vector3(1, 1, 1);
 const placeholderGeometry = new BoxGeometry(2, 2, 2).translate(0, 1, 0);
 const placeholderMaterial: Material = new MeshStandardMaterial({ color: "#ff3fa4", roughness: 1 });
 
@@ -265,8 +284,8 @@ export function Placeholders({ items }: { items: PlacedItem[] }) {
     if (!mesh) return;
     const m = new Matrix4();
     items.forEach((it, i) => {
-      const [x, y, z] = placementPosition(it.origin, it.placement);
-      mesh.setMatrixAt(i, m.makeTranslation(x, y, z));
+      const pose = placementPose(it.placement);
+      mesh.setMatrixAt(i, m.compose(pose.position, pose.quaternion, ONE));
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();

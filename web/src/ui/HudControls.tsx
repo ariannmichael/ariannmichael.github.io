@@ -5,7 +5,7 @@ import { useWebGL2 } from "@/ui/lib/hooks";
 import styles from "./AppShell.module.css";
 
 /**
- * Top-right game buttons (GPS, sound, quality). They only make sense with the 3D town running,
+ * Top-right game buttons (GPS, sound, PSX look, quality). They only make sense with the 3D town running,
  * so they're hidden when WebGL2 isn't available. The Plain view link next to them is server-rendered.
  */
 export default function HudControls() {
@@ -14,6 +14,8 @@ export default function HudControls() {
   const toggleMuted = useAppStore((s) => s.toggleMuted);
   const quality = useAppStore((s) => s.quality);
   const setQuality = useAppStore((s) => s.setQuality);
+  const psx = useAppStore((s) => s.psx);
+  const setPsx = useAppStore((s) => s.setPsx);
   const gpsOpen = useAppStore((s) => s.gpsOpen);
   const setGpsOpen = useAppStore((s) => s.setGpsOpen);
 
@@ -61,13 +63,33 @@ export default function HudControls() {
           )}
         </svg>
       </button>
+      {/* PSX look on/off. The visible text is the name ("PSX" / "Smooth"), so no aria-label that
+          could disagree with it (WCAG 2.5.3); aria-pressed says whether the retro look is on. */}
+      <button
+        type="button"
+        className={styles.hudBtn}
+        onClick={() => setPsx(!psx)}
+        aria-pressed={psx}
+        title={psx ? "PlayStation-style graphics (tap for smooth)" : "Smooth graphics (tap for PlayStation style)"}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          {psx ? (
+            // Chunky pixels
+            <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="currentColor" />
+          ) : (
+            <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+          )}
+        </svg>
+        <span className={styles.hudBtnText}>{psx ? "PSX" : "Smooth"}</span>
+      </button>
+      {/* Accessible name = "Graphics quality: HQ|Lite": it contains the visible text, as WCAG 2.5.3 asks */}
       <button
         type="button"
         className={styles.hudBtn}
         onClick={() => setQuality(quality === "high" ? "low" : "high")}
-        aria-label={`Graphics quality: ${quality}`}
         title={quality === "high" ? "High quality (tap for faster)" : "Low quality (tap for prettier)"}
       >
+        <span className="sr-only">Graphics quality: </span>
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
             d="M12 3l2.2 5.2L20 9l-4.4 3.8L17 19l-5-3-5 3 1.4-6.2L4 9l5.8-.8z"

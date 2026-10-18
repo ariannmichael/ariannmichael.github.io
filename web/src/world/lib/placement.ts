@@ -118,7 +118,10 @@ export const GROUND_HEIGHT_THRESHOLD = 0.3;
  * pieces are drive-through ("none") and everything else gets a box. Unknown models get "none"
  * because we have no bounds to build a box from.
  */
-export function resolveCollider(p: Placement, bounds: Bounds | undefined): "box" | "none" {
+export function resolveCollider(
+  p: Pick<Placement, "model" | "collider" | "scale">,
+  bounds: Bounds | undefined,
+): "box" | "none" {
   if (p.collider) return p.collider;
   if (!bounds) return "none";
   if (isGroundRef(p.model)) return "none";

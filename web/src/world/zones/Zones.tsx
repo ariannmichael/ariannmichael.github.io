@@ -6,8 +6,9 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { Vector3, type Group } from "three";
 import type { DistrictId } from "@/content/types";
-import type { DistrictLayout, Marker } from "@/world/layout/types";
-import { tileToWorld } from "@/world/lib/placement";
+import { districtOfBiome } from "@/world/lib/biomeMap";
+import { markerPose, markerSensorBox } from "@/world/lib/planetPlacement";
+import type { BiomeLayout, PlanetMarker } from "@/world/planet/types";
 import { useAppStore } from "@/state/useAppStore";
 import { vehicleState } from "@/world/vehicle/vehicleState";
 import { ZONE_HEIGHT, ZONE_SIZE, markerLabel } from "./markers";
@@ -32,31 +33,26 @@ export function labelScale(distance: number): number {
 const isVehicle = (payload: IntersectionEnterPayload) =>
   payload.other.rigidBody?.handle === vehicleState.bodyHandle;
 
-/** A sensor (6 x 6 m) and a floating label for every marker of every district. */
-export function Zones({ layouts }: { layouts: readonly DistrictLayout[] }) {
+/**
+ * Sensors, ground rings and floating labels for one biome's markers. Everything hangs off the marker's
+ * surface pose, so on the sphere the sensor box, the ring and the label all follow local up.
+ */
+export function BiomeZones({ layout }: { layout: BiomeLayout }) {
+  const district = districtOfBiome(layout.biome);
+  // A marker needs a district to become an ActiveZone (the badlands have none, by design)
+  if (!district || layout.markers.length === 0) return null;
   return (
-    <>
-      {layouts.map((l) => (
-        <DistrictZones key={l.id} layout={l} />
-      ))}
-    </>
-  );
-}
-
-function DistrictZones({ layout }: { layout: DistrictLayout }) {
-  if (layout.markers.length === 0) return null;
-  return (
-    <RigidBody type="fixed" colliders={false} name={`zones-${layout.id}`}>
+    <RigidBody type="fixed" colliders={false} name={`zones-${layout.biome}`}>
       {layout.markers.map((m) => (
-        <Zone key={m.id} marker={m} district={layout.id} origin={layout.origin} />
+        <Zone key={m.id} marker={m} district={district} />
       ))}
     </RigidBody>
   );
 }
 
-function Zone({ marker, district, origin }: { marker: Marker; district: DistrictId; origin: DistrictLayout["origin"] }) {
-  const [x, , z] = tileToWorld(origin, marker.x, marker.z);
+function Zone({ marker, district }: { marker: PlanetMarker; district: DistrictId }) {
   const label = useMemo(() => markerLabel(marker), [marker]);
+  const box = useMemo(() => markerSensorBox(marker, ZONE_SIZE, ZONE_HEIGHT), [marker]);
 
   const onEnter = (payload: IntersectionEnterPayload) => {
     if (!isVehicle(payload)) return;
@@ -73,20 +69,25 @@ function Zone({ marker, district, origin }: { marker: Marker; district: District
     <>
       <CuboidCollider
         sensor
-        args={[ZONE_SIZE / 2, ZONE_HEIGHT / 2, ZONE_SIZE / 2]}
-        position={[x, ZONE_HEIGHT / 2, z]}
+        args={box.halfExtents}
+        position={box.center}
+        quaternion={box.quaternion}
         onIntersectionEnter={onEnter}
         onIntersectionExit={onExit}
       />
-      <ZoneMarker x={x} z={z} label={label} />
+      <ZoneMarker marker={marker} label={label} />
     </>
   );
 }
 
-/** Floating label plus a flat ring on the ground showing where to park. */
-function ZoneMarker({ x, z, label }: { x: number; z: number; label: string }) {
+/** Floating label plus a flat ring on the ground showing where to park, in the marker's local frame. */
+function ZoneMarker({ marker, label }: { marker: PlanetMarker; label: string }) {
   const labelRef = useRef<Group>(null);
-  const labelPos = useMemo(() => new Vector3(x, LABEL_HEIGHT, z), [x, z]);
+  const pose = useMemo(() => markerPose(marker), [marker]);
+  const labelPos = useMemo(
+    () => pose.position.clone().addScaledVector(new Vector3(0, 1, 0).applyQuaternion(pose.quaternion), LABEL_HEIGHT),
+    [pose],
+  );
 
   useFrame(({ camera }) => {
     const g = labelRef.current;
@@ -97,11 +98,20 @@ function ZoneMarker({ x, z, label }: { x: number; z: number; label: string }) {
   });
 
   return (
-    <group position={[x, 0, z]}>
-      <mesh rotation-x={-Math.PI / 2} position-y={0.05} renderOrder={1}>
+    <group position={pose.position} quaternion={pose.quaternion}>
+      <mesh rotation-x={-Math.PI / 2} position-y={0.08} renderOrder={1}>
         <ringGeometry args={[ZONE_SIZE * 0.36, ZONE_SIZE * 0.42, 48]} />
-        <meshBasicMaterial color="#ffd23f" transparent opacity={0.85} depthWrite={false} />
+        {/* No PSX vertex snapping: the thin ring hovers just over the ground and would flicker into it */}
+        <meshBasicMaterial
+          color="#ffd23f"
+          transparent
+          opacity={0.85}
+          depthWrite={false}
+          userData={{ psxSkip: true }}
+        />
       </mesh>
+      {/* Billboard copies the camera's world rotation (minus the parent's), so the text is upright
+          on screen whatever the local up is, as long as the follow camera's `up` is the local up. */}
       <Billboard ref={labelRef} position-y={LABEL_HEIGHT}>
         <Text
           font={LABEL_FONT}
