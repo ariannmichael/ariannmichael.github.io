@@ -20,6 +20,9 @@ import {
 } from "./drive";
 import { FRONT_WHEELS, REAR_WHEELS, WHEEL_COUNT } from "./setup";
 
+/** Rapier `QueryFilterFlags.EXCLUDE_SENSORS`, inlined so this module doesn't import Rapier's runtime (and its WASM) eagerly. */
+export const QUERY_EXCLUDE_SENSORS = 8;
+
 export interface WheelTelemetry {
   /** World-space contact point (or the hanging wheel's lowest point when airborne) */
   contact: Vector3;
@@ -153,7 +156,8 @@ export class VehicleDriver {
       vc.setWheelFrictionSlip(i, t.frictionSlipRear * cmd.rearGrip);
     }
 
-    vc.updateVehicle(dt);
+    // Wheel rays must ignore sensors (marker zones), or every 6×6×4 m zone acts as a solid block.
+    vc.updateVehicle(dt, QUERY_EXCLUDE_SENSORS);
 
     // Gravity as an impulse (what PlanetGravity does for every other body). After the suspension
     // solve, so the dampers don't read the gravity kick as compression speed

@@ -95,6 +95,21 @@ const radialUp = (rb: RAPIER.RigidBody) => {
 };
 
 describe("ray-cast vehicle on the planet", () => {
+  it("wheel rays ignore sensors: a marker zone under the car is not solid ground", () => {
+    const { world, rb, driver, run } = planetRig();
+    // A 6×4×6 m marker sensor centred on the ground under the spawn, like zones/Zones.tsx
+    const zone = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(3, 2, 3).setTranslation(0, PLANET_RADIUS + 2, 0).setSensor(true),
+      zone,
+    );
+    run(idle, 3);
+    const t = rb.translation();
+    const height = Math.hypot(t.x, t.y, t.z) - PLANET_RADIUS;
+    expect(driver.wheelsInContact).toBe(4);
+    expect(height).toBeLessThan(VEHICLE.rideLift + 0.08); // on the ground, not perched 4 m up on the sensor
+  });
+
   it("drops from the spawn height and settles on all four wheels at the raised ride height", () => {
     const { rb, driver, run } = planetRig();
     run(idle, 3);
