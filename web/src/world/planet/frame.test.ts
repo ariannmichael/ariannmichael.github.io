@@ -11,6 +11,7 @@ import {
   surfaceFrame,
   surfacePose,
 } from "./frame";
+import { terrainHeight } from "./terrain";
 
 describe("planet frame", () => {
   it("maps lat/lon to the documented axes", () => {
@@ -52,7 +53,7 @@ describe("planet frame", () => {
     const pose = surfacePose(20, 30, 45, 2);
     const up = new Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
     expect(up.dot(latLonToDir(20, 30))).toBeCloseTo(1);
-    expect(pose.position.length()).toBeCloseTo(PLANET_RADIUS + 2); // terrain stub = 0
+    expect(pose.position.length()).toBeCloseTo(PLANET_RADIUS + terrainHeight(latLonToDir(20, 30)) + 2);
     const fwd = new Vector3(0, 0, 1).applyQuaternion(pose.quaternion);
     expect(fwd.dot(headingAt(surfaceFrame(latLonToDir(20, 30)), 45))).toBeCloseTo(1);
   });
