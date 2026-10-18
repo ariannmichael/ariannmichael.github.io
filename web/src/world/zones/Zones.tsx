@@ -10,6 +10,7 @@ import { districtOfBiome } from "@/world/lib/biomeMap";
 import { markerPose, markerSensorBox } from "@/world/lib/planetPlacement";
 import type { BiomeLayout, PlanetMarker } from "@/world/planet/types";
 import { useAppStore } from "@/state/useAppStore";
+import { LABEL_LAYER } from "@/world/psx/config";
 import { vehicleState } from "@/world/vehicle/vehicleState";
 import { ZONE_HEIGHT, ZONE_SIZE, markerLabel } from "./markers";
 
@@ -25,9 +26,16 @@ const LABEL_FULL_SIZE_DISTANCE = 28;
 const LABEL_MIN_SCALE = 0.3;
 const LABEL_HIDE_NEAR = 7;
 const LABEL_HIDE_FAR = 160;
+// Past this distance labels grow again (up to LABEL_FAR_SCALE at LABEL_HIDE_FAR) so the intro orbit stays readable.
+const LABEL_GROW_FROM = 60;
+const LABEL_FAR_SCALE = 1.8;
 
 export function labelScale(distance: number): number {
   if (distance < LABEL_HIDE_NEAR || distance > LABEL_HIDE_FAR) return 0;
+  if (distance > LABEL_GROW_FROM) {
+    const t = (distance - LABEL_GROW_FROM) / (LABEL_HIDE_FAR - LABEL_GROW_FROM);
+    return 1 + t * (LABEL_FAR_SCALE - 1);
+  }
   return Math.min(1, Math.max(LABEL_MIN_SCALE, distance / LABEL_FULL_SIZE_DISTANCE));
 }
 
@@ -112,9 +120,12 @@ function ZoneMarker({ marker, label }: { marker: PlanetMarker; label: string }) 
         />
       </mesh>
       {/* Billboard copies the camera's world rotation (minus the parent's), so the text is upright
-          on screen whatever the local up is, as long as the follow camera's `up` is the local up. */}
+          on screen whatever the local up is, as long as the follow camera's `up` is the local up.
+          The text sits on LABEL_LAYER only: in PSX mode the pipeline draws it after the low-res
+          pass at full resolution (depth-tested against the scene), so it stays readable. */}
       <Billboard ref={labelRef} position-y={LABEL_HEIGHT}>
         <Text
+          layers={LABEL_LAYER}
           font={LABEL_FONT}
           fontSize={1.1}
           color="#1d1d2b"

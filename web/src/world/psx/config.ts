@@ -29,6 +29,13 @@ export const PSX_DEFAULTS: PsxConfig = {
   scanlineStrength: 0.18,
 };
 
+/**
+ * three.js layer for world-space UI (marker labels). The PSX pipeline leaves this layer out of the
+ * low-res pass and draws it at full screen resolution afterwards, depth-tested against the upscaled
+ * scene depth, so text stays legible but still hides behind buildings. Smooth mode renders it normally.
+ */
+export const LABEL_LAYER = 1;
+
 /** PSX fog (metres): linear and close, like the PS1 draw-distance fog. Smooth mode sees further. */
 export const PSX_FOG = { near: 60, far: 180 };
 export const SMOOTH_FOG = { near: 90, far: 320 };

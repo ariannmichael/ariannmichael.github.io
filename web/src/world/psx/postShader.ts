@@ -1,5 +1,7 @@
 // Full-screen PSX post pass: low-res scene texture → sRGB → ordered dither → 15-bit colour.
-// Kept trivial on purpose: one nearest texture fetch and a handful of ALU ops per screen pixel.
+// Kept trivial on purpose: two nearest texture fetches and a handful of ALU ops per screen pixel.
+// It also copies the low-res depth into the screen depth buffer (nearest-upscaled), so the
+// full-resolution label pass that follows is occluded by the scene exactly where the pixels are.
 
 export const POST_VERTEX = /* glsl */ `
 varying vec2 vUv;
@@ -11,6 +13,7 @@ void main() {
 
 export const POST_FRAGMENT = /* glsl */ `
 uniform sampler2D tScene;
+uniform sampler2D tDepth;  // low-res scene depth (DepthTexture)
 uniform vec2 uRes;        // internal resolution (px)
 uniform float uLevels;    // 2^bits - 1
 uniform float uDither;    // dither amplitude in quantisation steps
@@ -39,5 +42,7 @@ void main() {
   c = floor(clamp(c, 0.0, 1.0) * uLevels + 0.5) / uLevels;
   if (uScanlines > 0.0) c *= 1.0 - uScanlines * mod(px.y, 2.0);
   gl_FragColor = vec4(c, 1.0);
+  // Same camera, same depth encoding: the stored value can go straight into the screen depth buffer
+  gl_FragDepth = texture2D(tDepth, vUv).r;
 }
 `;

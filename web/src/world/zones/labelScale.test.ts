@@ -7,9 +7,15 @@ describe("labelScale", () => {
     expect(labelScale(200)).toBe(0);
   });
 
-  it("keeps full size at a distance (perspective already shrinks it)", () => {
+  it("keeps full size at mid distance (perspective already shrinks it)", () => {
     expect(labelScale(28)).toBe(1);
-    expect(labelScale(90)).toBe(1);
+    expect(labelScale(60)).toBe(1);
+  });
+
+  it("grows again far away so the intro orbit stays readable", () => {
+    expect(labelScale(110)).toBeCloseTo(1.4);
+    expect(labelScale(160)).toBeCloseTo(1.8);
+    expect(labelScale(120)).toBeGreaterThan(labelScale(80));
   });
 
   it("shrinks as the camera gets close, never below the minimum", () => {

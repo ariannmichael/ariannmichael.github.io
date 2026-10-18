@@ -3,7 +3,9 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import {
+  AlwaysDepth,
   BufferGeometry,
+  DepthTexture,
   Float32BufferAttribute,
   HalfFloatType,
   Mesh,
@@ -12,6 +14,7 @@ import {
   Scene,
   ShaderMaterial,
   UnsignedByteType,
+  UnsignedIntType,
   Vector2,
   WebGLRenderTarget,
   type Camera,
@@ -19,7 +22,7 @@ import {
   type WebGLRenderer,
 } from "three";
 import { useAppStore } from "@/state/useAppStore";
-import { PSX_DEFAULTS, internalResolution, snapGrid, targetHeight, type PsxConfig } from "./config";
+import { LABEL_LAYER, PSX_DEFAULTS, internalResolution, snapGrid, targetHeight, type PsxConfig } from "./config";
 import { applyPsxToScene, psxUniforms, refreshPsxMaterials } from "./patchMaterials";
 import { POST_FRAGMENT, POST_VERTEX } from "./postShader";
 
@@ -50,6 +53,16 @@ export function usePsxMaterials(enabled: boolean): void {
   });
 }
 
+/**
+ * Labels live on LABEL_LAYER only, so the default camera must see that layer for smooth mode's normal
+ * render. Re-applied every frame because the active camera can be swapped (FollowCamera, makeDefault).
+ */
+function useLabelLayer(): void {
+  useFrame(({ camera }) => {
+    camera.layers.enable(LABEL_LAYER);
+  });
+}
+
 export interface PsxPipelineProps extends Partial<PsxConfig> {
   /** Override the store's `psx` flag (default: follow useAppStore.psx) */
   enabled?: boolean;
@@ -64,6 +77,7 @@ export function PsxPipeline({ enabled, ...overrides }: PsxPipelineProps) {
   const storePsx = useAppStore((s) => s.psx);
   const on = enabled ?? storePsx;
   usePsxMaterials(on);
+  useLabelLayer();
   return on ? <PsxRenderPass {...overrides} /> : null;
 }
 
@@ -92,6 +106,8 @@ export class PsxPass {
       generateMipmaps: false,
       depthBuffer: true,
       stencilBuffer: false,
+      // Kept as a texture so the post pass can hand it to the full-res label pass (see render())
+      depthTexture: new DepthTexture(1, 1, UnsignedIntType),
     });
     this.target.texture.name = "psx-scene";
 
@@ -100,13 +116,17 @@ export class PsxPass {
       fragmentShader: POST_FRAGMENT,
       uniforms: {
         tScene: { value: this.target.texture },
+        tDepth: { value: this.target.depthTexture },
         uRes: { value: new Vector2(1, 1) },
         uLevels: { value: 31 },
         uDither: { value: 1 },
         uScanlines: { value: 0 },
       },
-      depthTest: false,
-      depthWrite: false,
+      // Writes the upscaled scene depth (gl_FragDepth). depthTest must stay on for GL to write depth
+      // at all, so the test is made a no-op instead.
+      depthTest: true,
+      depthFunc: AlwaysDepth,
+      depthWrite: true,
     });
     this.material.userData.psxSkip = true;
 
@@ -135,16 +155,53 @@ export class PsxPass {
     psxUniforms.psxAffine.value = c.affine;
   }
 
-  /** Scene → low-res target → dither/quantise → screen. */
-  render(renderer: WebGLRenderer, scene: Object3D, camera: Camera): void {
-    const prev = renderer.getRenderTarget();
+  /**
+   * 1. Scene minus LABEL_LAYER → low-res target (colour + depth).
+   * 2. Dither/quantise to the screen, writing the nearest-upscaled depth alongside.
+   * 3. LABEL_LAYER only, straight to the screen at full resolution, depth-tested against step 2.
+   * Labels therefore render exactly once per frame, crisp, and still hide behind buildings.
+   */
+  render(renderer: WebGLRenderer, scene: Scene | Object3D, camera: Camera): void {
+    const prevTarget = renderer.getRenderTarget();
+    const prevMask = camera.layers.mask;
+
+    camera.layers.disable(LABEL_LAYER);
     renderer.setRenderTarget(this.target);
     renderer.render(scene, camera);
-    renderer.setRenderTarget(prev);
+    renderer.setRenderTarget(prevTarget);
     renderer.render(this.scene, this.camera);
+
+    camera.layers.set(LABEL_LAYER);
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false; // keep the blitted colour and depth
+    // A Color background is only applied on clear, but a texture/cube background would draw a
+    // full-screen mesh over the blit, so hide it. PSX fog is short (60-180 m) and would wash the
+    // labels out at intro-orbit distances; they are a UI overlay here, so draw them unfogged.
+    // Matrices were already updated by the first pass.
+    const s = scene as Scene;
+    const prevBackground = s.isScene ? s.background : null;
+    const prevFog = s.isScene ? s.fog : null;
+    const prevAutoUpdate = scene.matrixWorldAutoUpdate;
+    if (s.isScene) {
+      s.background = null;
+      s.fog = null;
+    }
+    scene.matrixWorldAutoUpdate = false;
+    try {
+      renderer.render(scene, camera);
+    } finally {
+      scene.matrixWorldAutoUpdate = prevAutoUpdate;
+      if (s.isScene) {
+        s.background = prevBackground;
+        s.fog = prevFog;
+      }
+      renderer.autoClear = prevAutoClear;
+      camera.layers.mask = prevMask;
+    }
   }
 
   dispose(): void {
+    this.target.depthTexture?.dispose();
     this.target.dispose();
     this.material.dispose();
     this.geometry.dispose();
