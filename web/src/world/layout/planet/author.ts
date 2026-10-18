@@ -1,6 +1,6 @@
-// Shared authoring helpers for biome layouts (coordinator-owned). Pure: safe at module top level
-// (never call surfacePose/terrainHeight at top level — import cycle with terrain pads).
-import { offsetLatLon } from "@/world/planet/frame";
+// Shared authoring helpers for biome layouts (coordinator-owned). Pure: imports only planet/sphere.ts
+// (no terrain), so it is safe at module top level. Layouts must never import planet/frame.ts.
+import { offsetLatLon } from "@/world/planet/sphere";
 import type { LatLon, PlanetMarker, PlanetPlacement } from "@/world/planet/types";
 
 /** Local metric grid around a biome anchor: at(north, east) in metres → lat/lon on the sphere. */
