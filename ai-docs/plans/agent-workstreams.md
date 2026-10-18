@@ -39,3 +39,9 @@ Agents can't drive the Godot editor, so **districts are authored as TypeScript d
 | **world** | `web/src/world/**` except `models/**` and `layout/districts/**`; `web/src/hooks/**` | 4 (+ the 5.2 sensors/labels) |
 | **ui** | `web/src/ui/**` except `ui/plain/**`; `web/src/app/page.tsx`; `web/src/app/district/**` | 5 |
 | **districts** (runs after assets and world finish) | `web/src/world/layout/districts/**` | 6 |
+
+---
+
+## v2 Planet World (branch `planet`, from 2026-10-17)
+
+Plan and ownership: `ai-docs/plans/planet-world-plan.md`. The same rules apply (Node 24 PATH prefix, no installs, no commits, stay in your paths). v2 contracts are owned by the coordinator: `web/src/world/planet/{config,frame,types,biomes}.ts` and `web/src/state/useAppStore.ts` (now with `psx`).

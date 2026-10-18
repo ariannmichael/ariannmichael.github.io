@@ -7,3 +7,4 @@ level-export/
 
 # Local scratch
 *.log
+/package-lock.json
