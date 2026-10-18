@@ -12,6 +12,7 @@ import {
   preparePads,
   terrainHeight,
   trackMask,
+  trailMaskXYZ,
 } from "./terrain";
 import { groundColorAt } from "./terrainColor";
 
@@ -109,6 +110,20 @@ describe("terrainHeight", () => {
     }
     expect(on / N).toBeGreaterThan(0.01);
     expect(on / N).toBeLessThan(0.1);
+  });
+
+  it("trails (colour and groove) fade out inside pads", () => {
+    const rnd = mulberry32(31);
+    const dir = new Vector3();
+    do randomDir(rnd, dir);
+    while (trackMask(dir) < 0.99);
+    const lat = Math.asin(dir.y) / DEG;
+    const lon = Math.atan2(dir.x, dir.z) / DEG;
+    const pads = preparePads([{ lat, lon, radius: 10, blend: 8 }]);
+    expect(trailMaskXYZ(dir.x, dir.y, dir.z, [])).toBe(trackMask(dir));
+    expect(trailMaskXYZ(dir.x, dir.y, dir.z, pads)).toBe(0);
+    // No pads: the groove is exactly the natural one
+    expect(analyticHeightXYZ(dir.x, dir.y, dir.z, [])).toBe(naturalHeightXYZ(dir.x, dir.y, dir.z));
   });
 
   it("groundColorAt returns a palette colour without allocating when given `out`", () => {

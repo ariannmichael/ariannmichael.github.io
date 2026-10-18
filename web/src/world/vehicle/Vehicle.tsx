@@ -26,7 +26,7 @@ import { DEFAULT_CAR_SCALE, VEHICLE, VEHICLE_REF } from "./constants";
 import { VehicleDriver } from "./controller";
 import { combineAxis, contactTrauma, type DriveInput } from "./drive";
 import { chassisInertia, configureVehicleController, wheelLayout } from "./setup";
-import { onTeleportRequest, spawnPointAt, vehicleSpawnPose, yawOfHeading, type SpawnPoint } from "./spawn";
+import { exposeDebugTeleport, onTeleportRequest, spawnPointAt, vehicleSpawnPose, yawOfHeading, type SpawnPoint } from "./spawn";
 import { BoxCar, VehicleModel, emptyVehicleNodes, type VehicleNodes } from "./VehicleModel";
 import { vehicleState } from "./vehicleState";
 
@@ -122,9 +122,11 @@ export function Vehicle({ spawn, spawnFor }: VehicleProps) {
     if (new URLSearchParams(window.location.search).has("debug")) {
       (window as unknown as { __vehicleState?: typeof vehicleState }).__vehicleState = vehicleState;
     }
+    const unexposeTeleport = exposeDebugTeleport(); // `?debug` only: window.__teleport(lat, lon, yaw)
     // Contact-force events only above a few g, so resting/scraping contacts stay quiet
     collider.current?.setContactForceEventThreshold(VEHICLE.mass * PLANET_GRAVITY * VEHICLE.contactForceMinG);
     return () => {
+      unexposeTeleport();
       driverRef.current = null;
       vehicleState.bodyHandle = -1;
       try {

@@ -2,7 +2,8 @@
 //
 // Two layers:
 // 1. `naturalHeight` / `analyticHeight`: the smooth noise field (biome shapes blended by
-//    biomeField weights + a global undulation + dirt-track grooves + flat pads). The mesh builder
+//    biomeField weights + a global undulation + dirt-track grooves + flat pads; trails fade out
+//    inside pads). The mesh builder
 //    samples it at every icosphere vertex.
 // 2. `terrainHeight`: the height of the *mesh* along a direction. It finds the icosphere triangle
 //    under the direction and intersects the ray with that triangle's plane, so placements, the
@@ -156,16 +157,20 @@ export function trackMask(dir: Vector3): number {
 
 const weightScratch = new Float32Array(BIOME_COUNT);
 
-/** Smooth noise height (metres above PLANET_RADIUS) without flat pads. Unit direction input. */
-export function naturalHeightXYZ(x: number, y: number, z: number): number {
+/** Noise height without trail grooves or pads. */
+function baseHeightXYZ(x: number, y: number, z: number): number {
   // Planet-scale swell (~150 m features) so the horizon rolls.
   let h = 4 * fbm(globalNoise, x * 1.1, y * 1.1, z * 1.1, 3, 2, 0.45);
   const w = biomeWeightsXYZ(x, y, z, weightScratch);
   for (let i = 0; i < BIOME_COUNT; i++) {
     if (w[i] > 1e-4) h += w[i] * biomeShape(i, x, y, z);
   }
-  h -= TRACK_GROOVE * trackMaskXYZ(x, y, z);
   return h;
+}
+
+/** Smooth noise height (metres above PLANET_RADIUS) without flat pads. Unit direction input. */
+export function naturalHeightXYZ(x: number, y: number, z: number): number {
+  return baseHeightXYZ(x, y, z) - TRACK_GROOVE * trackMaskXYZ(x, y, z);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -213,6 +218,33 @@ export function applyPads(x: number, y: number, z: number, h: number, pads: read
   return h;
 }
 
+/**
+ * 1 away from every pad, fading to 0 inside one (over its blend ring). Trails (their dirt colour and
+ * their groove) are multiplied by it, so they stop at plazas and lawns instead of crossing them.
+ */
+export function padFadeXYZ(x: number, y: number, z: number, pads: readonly PreparedPad[]): number {
+  let f = 1;
+  for (let k = 0; k < pads.length; k++) {
+    const p = pads[k];
+    const c = x * p.x + y * p.y + z * p.z;
+    if (c < p.cosOuter) continue;
+    f *= smoothstep(p.radius, p.radius + p.blend, Math.acos(c > 1 ? 1 : c) * R);
+    if (f === 0) return 0;
+  }
+  return f;
+}
+
+/** Dirt-trail amount as drawn and grooved: trackMask faded out inside pads. */
+export function trailMaskXYZ(
+  x: number,
+  y: number,
+  z: number,
+  pads: readonly PreparedPad[] = getDefaultPads(),
+): number {
+  const m = trackMaskXYZ(x, y, z);
+  return m > 0 ? m * padFadeXYZ(x, y, z, pads) : 0;
+}
+
 // Resolved lazily on first use rather than at import: biome layout modules may import frame.ts
 // (which imports this file), and resolving at import time would read PLANET_LAYOUTS mid-cycle.
 let defaultPads: PreparedPad[] | null = null;
@@ -229,7 +261,8 @@ export function analyticHeightXYZ(
   z: number,
   pads: readonly PreparedPad[] = getDefaultPads(),
 ): number {
-  return applyPads(x, y, z, naturalHeightXYZ(x, y, z), pads);
+  // Same as naturalHeightXYZ, but the groove fades out inside pads (identical with no pads)
+  return applyPads(x, y, z, baseHeightXYZ(x, y, z) - TRACK_GROOVE * trailMaskXYZ(x, y, z, pads), pads);
 }
 
 // ---------------------------------------------------------------------------------------------

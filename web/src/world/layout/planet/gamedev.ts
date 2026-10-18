@@ -50,11 +50,12 @@ for (const [n, e] of [[-14, -34], [8, -35], [26, -34], [46, -38], [-16, -54], [1
 
 // ---------------------------------------------------------------------------------------------
 // Arcade hall: Super Mega Ultra Pong (north-east). Mini-arcade walls at ×2.4 → 6 m cells, 6 m tall.
-// 24 m (E–W) × 18 m (N–S), open roof; the doorway is the missing south-wall cell (6 m clear).
+// 24 m (E–W) × 18 m (N–S), open roof. Drive-through: the doorways are the missing south- and
+// north-wall cells at e = −3 (6 m clear), so the car never has to turn round or reverse out.
 const H = { n: 30, e: 24 };
 const WALL = { model: "mini-arcade/wall" as const, scale: 2.4 };
 for (const e of [-9, 3, 9]) P(H.n - 9, H.e + e, { ...WALL }); // south (gap at e = -3)
-for (const e of [-9, -3, 3, 9]) P(H.n + 9, H.e + e, { ...WALL }); // north
+for (const e of [-9, 3, 9]) P(H.n + 9, H.e + e, { ...WALL }); // north (gap at e = -3)
 for (const n of [-6, 0, 6]) {
   P(H.n + n, H.e - 12, { ...WALL, yaw: 90 }); // west
   P(H.n + n, H.e + 12, { ...WALL, yaw: 90 }); // east
@@ -62,7 +63,7 @@ for (const n of [-6, 0, 6]) {
 for (const e of [-9, -3, 3, 9]) for (const n of [-6, 0, 6]) P(H.n + n, H.e + e, { model: "mini-arcade/floor", scale: 2.4 });
 // Cabinets along the walls (×1.6), leaving the middle free to drive around
 const CAB = 1.6;
-for (const e of [-9.5, -7, -4.5]) P(H.n + 7, H.e + e, { model: "mini-arcade/arcade-machine", scale: CAB, yaw: 180 });
+for (const e of [-9.2, -7.4, -5.6]) P(H.n + 7, H.e + e, { model: "mini-arcade/arcade-machine", scale: CAB, yaw: 180 });
 P(H.n + 6.2, H.e + 1, { model: "mini-arcade/dance-machine", scale: CAB, yaw: 180 });
 P(H.n + 6.2, H.e + 5, { model: "mini-arcade/dance-machine", scale: CAB, yaw: 180 });
 for (const n of [-4, -1, 2]) P(H.n + n, H.e - 10, { model: "mini-arcade/pinball", scale: CAB, yaw: -90 });
@@ -86,14 +87,15 @@ P(S.n + 13, S.e - 6, { model: "space-kit/meteor", scale: 1.2, yaw: 75 });
 
 // ---------------------------------------------------------------------------------------------
 // Rat Catcher (south-east): a dungeon you drive into, under an earth mound. Mini-dungeon cells at
-// ×1.8 → 4.5 m cubes, 4.95 m tall. 5×5 ring of walls (doorway = the north-middle cell), grass roof.
+// ×1.8 → 4.5 m cubes, 4.95 m tall. 5×5 ring of walls, grass roof. A drive-through cave: doorways are
+// the north- and south-middle cells, because a 4.5 m door is too tight to reverse out of reliably.
 const D = { n: -36, e: 20 };
 const C = 4.5;
 const DS = 1.8;
 for (let i = -2; i <= 2; i++) {
   for (let j = -2; j <= 2; j++) {
     const ring = Math.abs(i) === 2 || Math.abs(j) === 2;
-    const door = i === 2 && j === 0;
+    const door = Math.abs(i) === 2 && j === 0;
     if (ring && !door) P(D.n + i * C, D.e + j * C, { model: "mini-dungeon/wall", scale: DS });
     else P(D.n + i * C, D.e + j * C, { model: "mini-dungeon/floor", scale: DS });
   }
@@ -108,7 +110,7 @@ P(D.n - 5.5, D.e + 5.5, { model: "mini-dungeon/barrel", scale: 1.2, body: "dynam
 P(D.n - 5.5, D.e + 3.8, { model: "mini-dungeon/barrel", scale: 1.2, body: "dynamic" });
 P(D.n - 3.8, D.e + 5.5, { model: "mini-dungeon/barrel", scale: 1.2, body: "dynamic" });
 P(D.n + 4, D.e - 5.5, { model: "mini-dungeon/barrel", scale: 1.2, body: "dynamic" });
-P(D.n - 3, D.e - 1, { model: "mini-characters/character-male-a", anim: "holding-right" });
+P(D.n - 2, D.e - 4, { model: "mini-characters/character-male-a", anim: "holding-right" }); // off the lane
 
 // ---------------------------------------------------------------------------------------------
 // Get Notes (west of the plaza): a little wooden music stage facing east, with drum barrels and a
@@ -174,10 +176,14 @@ P(-45.5, -42.5, { model: "mini-dungeon/barrel", scale: 1.3, body: "dynamic" });
 P(-41, -39, { model: "mini-characters/character-female-a", yaw: yawToward(-1, -1), anim: "idle" });
 
 // ---------------------------------------------------------------------------------------------
+// The arcade and dungeon markers sit beside their doorway approach lanes, not on them: the vehicle's
+// wheel raycasts currently hit the 6 × 4 × 6 m zone sensors, so a sensor in a doorway lane acts as an
+// invisible 4 m block the car stalls against (wheels spinning). Keep every sensor ≥ 1.5 m clear of
+// the 2.55 m-wide lane through a door (see gamedev.test.ts).
 const markers: PlanetMarker[] = [
-  marker(H.n - 16, H.e - 3, { id: "super-mega-ultra-pong", kind: "game", label: "Mega Ultra Pong" }),
+  marker(H.n - 17, H.e - 10, { id: "super-mega-ultra-pong", kind: "game", label: "Mega Ultra Pong" }),
   marker(S.n, S.e - 12, { id: "shoot-em-all", kind: "game", label: "Shoot 'Em All" }),
-  marker(D.n + 18, D.e, { id: "rat-catcher", kind: "game", label: "Rat Catcher" }),
+  marker(D.n + 16, D.e + 8, { id: "rat-catcher", kind: "game", label: "Rat Catcher" }),
   marker(-40, -24, { id: "lead-me-to-the-light", kind: "game", label: "Lead Me To The Light" }),
   marker(M.n, M.e + 9, { id: "get-notes", kind: "game", label: "Get Notes" }),
 ];

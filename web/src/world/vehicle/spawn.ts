@@ -59,3 +59,17 @@ export function onTeleportRequest(fn: TeleportListener): () => void {
     if (listener === fn) listener = null;
   };
 }
+
+/**
+ * QA hook: with `?debug` in the URL, `window.__teleport(lat, lon, yaw)` drops the car anywhere (the
+ * screenshot harness uses it to park in front of doorways). Inert without `?debug`. Returns a cleanup.
+ */
+export function exposeDebugTeleport(): () => void {
+  if (typeof window === "undefined" || !new URLSearchParams(window.location.search).has("debug")) return () => {};
+  const w = window as unknown as { __teleport?: (lat: number, lon: number, yaw?: number) => void };
+  const fn = (lat: number, lon: number, yaw = 0) => requestVehicleTeleport({ lat, lon, yaw });
+  w.__teleport = fn;
+  return () => {
+    if (w.__teleport === fn) delete w.__teleport;
+  };
+}

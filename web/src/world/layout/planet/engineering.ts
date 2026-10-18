@@ -109,10 +109,11 @@ for (const [i, de] of [-6.6, 0, 6.6].entries()) {
     dock.push(place(D[0] - 6, D[1] + de, { model: `city-industrial/shipping-container-${c}`, yaw: 90, y }));
   }
 }
-for (const dn of [-2.4, 2.4]) {
-  for (const de of [-7.2, -2.4, 2.4, 7.2]) {
-    dock.push(place(D[0] + dn, D[1] + de, { model: "factory-kit/floor-large", y: 5.62, scale: 1.2 }));
-  }
+// Roof: three solid 8.8 m deck slabs resting on the container stacks (a 3 m awning past each mouth).
+// A zero-thickness floor tile read black from below (its dark top swatch, back-lit); these slabs
+// have a real light-metal underside, which the hemisphere fill lights from below.
+for (const de of [-8.8, 0, 8.8]) {
+  dock.push(place(D[0], D[1] + de, { model: "space-kit/platform_large", y: 5.6, scale: 1.1 }));
 }
 dock.push(
   // inside: conveyor and crates along the north wall, hazard posts at both mouths
@@ -120,7 +121,7 @@ dock.push(
   place(D[0] + 3.5, D[1], { model: "factory-kit/conveyor-long-stripe", yaw: 90 }),
   place(D[0] + 3.6, D[1] + 4, { model: "factory-kit/box-large" }),
   place(D[0] + 3.6, D[1] + 6.5, { model: "factory-kit/box-large" }),
-  place(D[0] + 3.5, D[1] - 8, { model: "factory-kit/robot-arm-a", yaw: 180 }),
+  place(D[0] + 3.5, D[1] - 8, { model: "factory-kit/robot-arm-a", yaw: 180, scale: 0.85 }), // 5.4 m: under the roof
   place(D[0] + 4, D[1] - 11, { model: "factory-kit/warning-traffic" }),
   place(D[0] - 4, D[1] - 11, { model: "factory-kit/warning-traffic" }),
   place(D[0] + 4, D[1] + 11, { model: "factory-kit/warning-traffic" }),

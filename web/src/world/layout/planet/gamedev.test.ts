@@ -5,7 +5,8 @@ import { getContent } from "@/content";
 import { hasModel } from "@/world/models";
 import { angleBetween, latLonToDir } from "@/world/planet/frame";
 import { BIOMES } from "@/world/planet/biomes";
-import { budgetCounts, fixedBoxes, groundPoint, insideBox, sensorCenter } from "./c/check";
+import { markerSensorBox } from "@/world/lib/planetPlacement";
+import { SENSOR, budgetCounts, fixedBoxes, groundPoint, insideBox, sensorCenter } from "./c/check";
 import { grid } from "./author";
 import { gamedevLayout as layout } from "./gamedev";
 
@@ -55,10 +56,11 @@ describe("gamedev layout", () => {
   it("leaves a clear lane from each drive-in marker through its doorway", () => {
     const g = grid(biome.center);
     const boxes = fixedBoxes(layout);
-    // [from north, to north, lane centre east]: arcade (north through the south-wall gap), dungeon (south)
+    // [from north, to north, lane centre east]: both interiors are drive-through, so the lanes run
+    // from in front of the entrance out through the far doorway (arcade south → north, dungeon north → south)
     const lanes: [number, number, number][] = [
-      [14, 30, 21],
-      [-18, -36, 20],
+      [14, 46, 21],
+      [-18, -54, 20],
     ];
     const hits: string[] = [];
     for (const [n0, n1, e] of lanes) {
@@ -68,6 +70,26 @@ describe("gamedev layout", () => {
             const pt = groundPoint(g.at(n, e + de), h);
             for (const b of boxes) if (insideBox(pt, b.box)) hits.push(`${n},${e + de} in ${b.model}`);
           }
+        }
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it("keeps marker sensors out of the doorway approach lanes", () => {
+    // The wheel raycasts hit zone sensors today, so a sensor in a lane is an invisible 4 m block.
+    const g = grid(biome.center);
+    const sensors = layout.markers.map((m) => ({ id: m.id, box: markerSensorBox(m, SENSOR.size, SENSOR.height) }));
+    const lanes: [number, number, number][] = [
+      [2, 46, 21],
+      [-8, -54, 20],
+    ];
+    const hits: string[] = [];
+    for (const [n0, n1, e] of lanes) {
+      for (let n = n0; Math.abs(n - n0) <= Math.abs(n1 - n0); n += Math.sign(n1 - n0) * 0.5) {
+        for (const de of [-1.4, 0, 1.4]) {
+          const pt = groundPoint(g.at(n, e + de), 0.5);
+          for (const s of sensors) if (insideBox(pt, s.box, 1.5)) hits.push(`${n},${e + de} in ${s.id}`);
         }
       }
     }

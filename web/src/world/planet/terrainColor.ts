@@ -8,7 +8,7 @@ import { BIOMES } from "./biomes";
 import { BIOME_COUNT, biomeWeightsXYZ, dominantBiomeIndexXYZ } from "./biomeField";
 import { PLANET_RADIUS } from "./config";
 import { createNoise3D, fbm, hash01, smoothstep } from "./noise";
-import { trackMaskXYZ } from "./terrain";
+import { trailMaskXYZ } from "./terrain";
 
 const shadeNoise = createNoise3D(4051);
 
@@ -86,7 +86,7 @@ export function faceColor(
   if (rockT > h2) {
     c = pal.rock;
   } else {
-    const m = trackMaskXYZ(x, y, z);
+    const m = trailMaskXYZ(x, y, z); // no dirt across plazas/lawns (pads)
     c = m > 0.25 + 0.5 * h2 ? pal.dirt : pal.ground[shadeIndex(x, y, z, pal.ground.length, (h3 - 0.5) * 0.3)];
   }
   // Tiny per-face brightness jitter: keeps big flat areas from looking like one plastic sheet.
@@ -103,7 +103,7 @@ export function faceColor(
 export function groundColorAt(dir: Vector3, out: Color = new Color()): Color {
   const b = dominantBiomeIndexXYZ(dir.x, dir.y, dir.z);
   const pal = PALETTES[b];
-  if (trackMaskXYZ(dir.x, dir.y, dir.z) > 0.5) return out.copy(pal.dirt);
+  if (trailMaskXYZ(dir.x, dir.y, dir.z) > 0.5) return out.copy(pal.dirt);
   return out.copy(pal.ground[shadeIndex(dir.x, dir.y, dir.z, pal.ground.length, 0)]);
 }
 
