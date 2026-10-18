@@ -261,3 +261,39 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 - Store: `psx` + `setPsx` (default on).
 - Root `/package-lock.json` (empty, created by `npx serve`) removed and git-ignored.
 - **Launched 4 parallel agents:** terrain (P1), vehicle + camera + FX (P2), psx-sky (P3), integration (P4). The biome agents (P5) follow.
+
+### P1 — Terrain & gravity ✅ (terrain agent, commit `9a9c490`)
+- **Mesh:** a class I geodesic icosphere at subdivision 44: **38,720 triangles**, ~3.8 m edges, the same mesh for render and collider. The render geometry is non-indexed with per-face normals and colours (PS1 facets). Building it takes about 80 ms, and the trimesh about 21 ms.
+- **`terrainHeight` is exact against the mesh**, found by intersecting with the triangle under the direction (error ≤ 1e-4 m), so props, wheels and camera agree.
+- **Biome blending:** biomes blend over soft 8–15° borders. Heights run −8..+18 m. Rolling biomes have a p95 slope of about 23°; ridged ones (financial, opensource, badlands) are steeper, with terraces.
+- **Dirt trails** along great circles, connecting each biome to its 2 nearest neighbours.
+- **Gravity:** centre-pointing impulses on every awake dynamic body (`gravityScale` honoured). Rapier's world gravity is 0.
+- **Coordinator:** `frame.test.ts` updated for real terrain heights.
+
+### P3 — PSX & sky ✅ (psx-sky agent, commit `983150b`)
+- **`PsxPipeline`:** a low-res target (360 px tall on desktop, 270 on phones or "low"), nearest upscale, 15-bit colour with a 4×4 Bayer dither.
+- **Global material patch** (hooked on `Material.prototype`): vertex snapping to a 240-row grid, affine UVs at 0.35, nearest maps. Depth, Raw and troika text materials are skipped.
+- **Procedural sky:** based on local up, with dithered clouds, sun and stars. It tints by biome and snaps on teleport, and it owns `scene.fog` (60–180 m in PSX mode).
+- **Lighting:** a fixed sun (Game Dev Park ends up on the night side, with dusk and stars). Night fill keeps every biome readable. Real shadows only in high quality with PSX off; otherwise a blob shadow.
+
+### P2 — Off-road SUV, camera shake, wheel dust ✅ (vehicle agent) + P4 — Integration ✅ (integration agent), commit `f2713d1`
+- **Vehicle:** `car-kit/suv` on Rapier's `DynamicRayCastVehicleController`.
+  - AWD (70% rear), 0.5 m suspension travel, top speed about 25 m/s.
+  - Handbrake drift, air control, auto-upright, landing and crash detection.
+  - Headless Rapier tests: it climbs 35°, holds on 20° and recovers from a flip.
+  - **Approved deviations:** the chassis uses `gravityScale={0}` and applies its own centre gravity; R resets in place (GPS still teleports to district spawns).
+- **Camera:** the follow camera's up is local planet up; it is terrain-clamped with line-of-sight lift. The intro orbit shows the curvature. Trauma-based shake (rumble, landings, crashes), off with reduced motion.
+- **Wheel dust:** a single instanced draw call of PSX puffs (pool of 400, 140 on low), coloured from `groundColorAt`.
+- **Integration:**
+  - Experience runs with zero-gravity Physics plus `PlanetGravity` and `PlanetGround`.
+  - Streaming placement renderer (load within 70°, unload past 90°, spread over idle frames) with oriented colliders.
+  - Zones on local up, `DistrictTracker` by `biomeAt`, PSX toggle in the HUD.
+  - The GPS lists all 7 biomes.
+  - Physics mounts after first paint plus an idle callback.
+- **Lighthouse on `/`** (sandbox content): **a11y 100** (fixed `aria-prohibited-attr` with `role="img"`, and the HQ button's name mismatch); perf 57 (was 38), TBT 1.8 s (was 11.2 s).
+- **v1 flat layouts removed on this branch** (`main` keeps them).
+
+### P5 kickoff (Claude)
+- Biome stubs (one file per biome) and `layout/planet/author.ts` (`grid(center)` → `at`/`place`/`marker`). `PLANET_LAYOUTS` collects all 8. Shared brief: `ai-docs/plans/biome-authoring-brief.md`.
+- **3 biome agents in parallel:** A (home, engineering, raceway), B (healthcare, financial, opensource), C (gamedev, badlands).
+- **Label font:** switched to **Kenney Mini Square Mono**. A render of every Kenney font showed this is the only one whose "K" doesn't read as "H" ("SPEED HING" bug).
