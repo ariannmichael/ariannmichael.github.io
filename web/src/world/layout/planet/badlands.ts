@@ -14,7 +14,7 @@ import type { BiomeLayout, FlatPad, PlanetPlacement } from "@/world/planet/types
 import { localGrid as grid } from "./c/helpers";
 
 const CENTER = BIOMES.find((b) => b.id === "badlands")!.center;
-const { at, place } = grid(CENTER);
+const { at, place, spawn } = grid(CENTER);
 
 const placements: PlanetPlacement[] = [];
 const P = (n: number, e: number, rest: Omit<PlanetPlacement, "lat" | "lon">) => placements.push(place(n, e, rest));
@@ -104,7 +104,7 @@ trees.forEach(([n, e, model, scale], k) => P(n, e, { model: model as PlanetPlace
 export const badlandsLayout: BiomeLayout = {
   biome: "badlands",
   // Facing north down the kicker line. The GPS can't send you here, but the layout still needs one.
-  spawn: { ...at(0, 0), yaw: 0 },
+  spawn: spawn(0, 0, 0),
   pads,
   markers: [],
   placements,

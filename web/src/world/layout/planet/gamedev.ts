@@ -17,7 +17,7 @@ import type { BiomeLayout, FlatPad, PlanetMarker, PlanetPlacement } from "@/worl
 import { localGrid as grid, path, yawToward } from "./c/helpers";
 
 const CENTER = BIOMES.find((b) => b.id === "gamedev")!.center;
-const { at, place, marker } = grid(CENTER);
+const { at, place, marker, spawn } = grid(CENTER);
 
 const placements: PlanetPlacement[] = [];
 const P = (n: number, e: number, rest: Omit<PlanetPlacement, "lat" | "lon">) => placements.push(place(n, e, rest));
@@ -214,7 +214,7 @@ const pads: FlatPad[] = [
 
 export const gamedevLayout: BiomeLayout = {
   biome: "gamedev",
-  spawn: { ...at(-8, 0), yaw: 0 },
+  spawn: spawn(-8, 0, 0),
   pads,
   markers,
   placements,

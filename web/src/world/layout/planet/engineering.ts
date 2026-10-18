@@ -22,7 +22,7 @@ import { author } from "./a/kit";
 const ROAD_SCALE = 1.02;
 
 const CENTER = BIOMES.find((b) => b.id === "engineering")!.center;
-const { at, place, placeC, marker } = author(CENTER);
+const { at, place, placeC, marker, spawn } = author(CENTER);
 
 // --- Streets: two N-S avenues (e = ±20) and two E-W streets (n = ±20) --------------------------
 const S = 20;
@@ -147,7 +147,7 @@ const outskirts: PlanetPlacement[] = [
 export const engineeringLayout: BiomeLayout = {
   biome: "engineering",
   // South of the grid on the central lane, looking north across the plaza at Stefanini
-  spawn: { ...at(-35, 0), yaw: 0 },
+  spawn: spawn(-35, 0, 0),
   pads: [
     // the raised plateau
     { ...at(0, 0), radius: 46, blend: 12, height: 2.5 },

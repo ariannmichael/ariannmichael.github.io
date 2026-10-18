@@ -20,7 +20,7 @@ import { BIOMES } from "@/world/planet/biomes";
 import { author, yawToward } from "./a/kit";
 
 const CENTER = BIOMES.find((b) => b.id === "raceway")!.center;
-const { at, place, placeC, marker } = author(CENTER);
+const { at, place, placeC, marker, spawn } = author(CENTER);
 
 // Stadium track: straights at n = ±HALF, hairpins centred on (0, ±TURN_E) with centreline radius HALF.
 const HALF = 22;
@@ -158,7 +158,7 @@ const canyon: PlanetPlacement[] = [
 export const racewayLayout: BiomeLayout = {
   biome: "raceway",
   // On the grid, facing east down the start straight toward the gantry and the billboard
-  spawn: { ...at(-HALF, -22), yaw: -90 },
+  spawn: spawn(-HALF, -22, -90),
   pads: [
     // the valley floor: whole circuit, stands and infield, dug 1 m below the natural centre
     { ...at(0, 0), radius: 56, blend: 12, height: -1 },

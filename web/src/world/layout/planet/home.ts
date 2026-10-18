@@ -22,7 +22,7 @@ import { author } from "./a/kit";
 const ROAD_SCALE = 1.02;
 
 const CENTER = BIOMES.find((b) => b.id === "home")!.center;
-const { at, place, placeC, marker } = author(CENTER);
+const { at, place, placeC, marker, spawn } = author(CENTER);
 
 // --- Road loop: corners at (±16, ±16), straights between (8 m city tiles) -----------------------
 const R = 16;
@@ -172,7 +172,7 @@ const wilds: PlanetPlacement[] = [
 export const homeLayout: BiomeLayout = {
   biome: "home",
   // On the south road, looking north across the lawn at the campus
-  spawn: { ...at(-16, -4), yaw: 0 },
+  spawn: spawn(-16, -4, 0),
   pads: [
     // the town core: road loop, house, plaza, campus, office, billboard
     { ...at(2, 0), radius: 42, blend: 12 },

@@ -349,3 +349,10 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
   - **Wiring:** `CameraCollisionBridge`, mounted by Claude in `Experience` inside `<Physics>`, hands the Rapier world to `FollowCamera`.
   - **Checked:** the dungeon no longer goes grey, and the car stays visible in every interior.
   - **Tests:** 43 files, 300 tests.
+
+### v2 fix: road tile alignment (2026-10-18)
+- **Bug:** road tiles in Hometown, Downtown, Raceway, Game Dev Park and Badlands were twisted against each other. `grid()` took yaw against the *local* north at each tile, and meridians converge, so local north drifts from grid north (up to ~16° at ±48 m in mid-latitude biomes, ~70° in Badlands at −65°).
+- `web/src/world/layout/planet/author.ts`: `grid().place` converts yaw from the grid frame to the local frame (finite-difference grid north); new `grid().spawn(n, e, yaw)` does the same for spawns. Positions are unchanged.
+- `web/src/world/layout/planet/c/helpers.ts`: `localGrid` is now an alias of `grid` (author.ts is cycle-safe since the sphere.ts split), so C biomes get the fix too.
+- `home.ts`, `engineering.ts`, `raceway.ts`, `gamedev.ts`, `badlands.ts`: spawns go through `spawn()`.
+- New `author.test.ts`: placed headings match grid directions (<0.05°) away from the anchor.
