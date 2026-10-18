@@ -76,11 +76,11 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [ ] P2.5 Keep the existing contracts: `vehicleState`, `useInputStore`, teleport/reset semantics, and pause
 
 ### Phase P3 — PSX + skybox (psx-sky agent)
-- [ ] P3.1 Low-res render pipeline (render target at a fixed internal height, nearest upscale) with a toggle
-- [ ] P3.2 Material patch: vertex snapping (clip-space quantisation), affine UVs, nearest texture filtering
-- [ ] P3.3 Post pass: colour depth reduction plus a Bayer dither and fog
-- [ ] P3.4 Procedural skybox (gradient, dithered clouds, sun, night stars) with a biome tint hook
-- [ ] P3.5 Off switch for accessibility and perf, and keep frame cost low on mobile
+- [x] P3.1 Low-res render pipeline (render target at a fixed internal height, nearest upscale) with a toggle
+- [x] P3.2 Material patch: vertex snapping (clip-space quantisation), affine UVs, nearest texture filtering
+- [x] P3.3 Post pass: colour depth reduction plus a Bayer dither and fog
+- [x] P3.4 Procedural skybox (gradient, dithered clouds, sun, night stars) with a biome tint hook
+- [x] P3.5 Off switch for accessibility and perf, and keep frame cost low on mobile
 
 ### Phase P4 — Integration (integration agent)
 - [ ] P4.1 Planet renderer: instanced Kenney placements from `lat/lon/yaw` (reuse the current instancing, with arbitrary orientation)
