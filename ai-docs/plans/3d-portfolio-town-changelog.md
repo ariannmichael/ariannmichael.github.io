@@ -224,3 +224,40 @@ Ariann asked Claude to "do everything" and to use agents to go faster. Mentor Mo
   - Go-live (switch Pages to Actions, then merge-push to `main`), **waiting on Ariann's approval**
   - GoatCounter site creation (Ariann)
   - CV header name choice (Ariann)
+
+## Phase 7.1 / 7.3 follow-up (2026-10-17, Claude, on `main`)
+- **OG image** added to the `/plain/` and `/district/[id]` metadata (they replace the layout's openGraph). All 9 pages now emit `og:image`.
+- **Lighthouse** (local static build, headless Chrome with SwiftShader):
+
+  | Page | Perf | A11y | Best practices | SEO | Notes |
+  |---|---|---|---|---|---|
+  | `/plain/` | 96 | 100 | 82 | 100 | LCP 2.7 s, TBT 10 ms |
+  | `/` | 38 | 95 | 82 | 100 | LCP 21 s, TBT 11.2 s |
+
+  - The `/` perf number is inflated by software WebGL, but load-time main-thread work is real. It's tracked in the v2 plan.
+  - `/` a11y fails: `aria-prohibited-attr` and `label-content-name-mismatch`. Assigned to the v2 integration agent.
+- **Caveman plugin:** installed but disabled in `~/.claude/settings.json` (`caveman@caveman: false`). Its SKILL.md is followed manually this session; settings are unchanged.
+
+---
+
+# v2 Planet World (branch `planet`)
+
+Ariann's feature request (2026-10-17):
+- camera shake
+- wheel smoke particles
+- distinct biomes using different models, with interiors you can drive into
+- skybox
+- a globe you can drive around
+- off-road driving like *Over the Hill*
+- PSX visuals
+- as many subagents as needed
+
+Plan: `ai-docs/plans/planet-world-plan.md`.
+
+### P0 — Contracts ✅ (Claude)
+- Branch `planet`.
+- `web/src/world/planet/config.ts` (R = 150 m, g = 18 m/s²), `frame.ts` (lat/lon ↔ direction, surface frame, `surfacePose`, `offsetLatLon`, 6 tests), `types.ts` (BiomeLayout, PlanetPlacement, PlanetMarker, FlatPad, Biome), `biomes.ts` (8 biomes: 7 career + badlands), and a `terrain.ts` stub.
+- `layout/planet/index.ts` (empty `PLANET_LAYOUTS`).
+- Store: `psx` + `setPsx` (default on).
+- Root `/package-lock.json` (empty, created by `npx serve`) removed and git-ignored.
+- **Launched 4 parallel agents:** terrain (P1), vehicle + camera + FX (P2), psx-sky (P3), integration (P4). The biome agents (P5) follow.
