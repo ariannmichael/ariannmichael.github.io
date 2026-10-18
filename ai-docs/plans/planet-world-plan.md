@@ -89,9 +89,9 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [ ] P4.4 UI: a PSX toggle in the HUD and quality menu, a "Classic/Smooth" option, and the Lighthouse a11y fixes (`aria-prohibited-attr`, `label-content-name-mismatch`)
 
 ### Phase P5 — Biomes & interiors (biomes agents)
-- [ ] P5.1 The 8 biomes authored as data, each using distinct kits and palettes, with all markers for jobs and games
-- [ ] P5.2 Drivable interiors: lab corridors (modular-space-kit), factory hall (factory-kit), arcade hall (mini-arcade), dungeon cave (modular-dungeon/mini-dungeon), pit garage (racing-kit)
-- [ ] P5.3 Off-road routes: dirt trails between biomes, jumps, the raceway circuit on terrain
+- [x] P5.1 The 8 biomes authored as data, each using distinct kits and palettes, with all markers for jobs and games
+- [x] P5.2 Drivable interiors: lab corridors (modular-space-kit), factory hall (factory-kit), arcade hall (mini-arcade), dungeon cave (modular-dungeon/mini-dungeon), pit garage (racing-kit)
+- [x] P5.3 Off-road routes: dirt trails between biomes, jumps, the raceway circuit on terrain
 
 ### Phase P6 — QA & ship
 - [ ] P6.1 Screenshot QA of every biome and interior (headless harness), plus a perf pass (draw calls, triangles, load blocking time)

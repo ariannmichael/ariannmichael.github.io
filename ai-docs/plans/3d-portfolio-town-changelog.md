@@ -302,3 +302,30 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 - **Ship v2 only:** v1 is never released. The planet must be live before 2026-11-10.
 - **CV header name: "Ariann Michael Farias"**, confirmed. That is already the value in `web/scripts/generate-cv.mjs` (`CV_NAME`), so the PDF needs no change. The site keeps "Ariann Michael".
 - **GoatCounter site created** by Ariann (`ariannmichael`). The site already loads `https://ariannmichael.goatcounter.com/count` with `//gc.zgo.at/count.js` (via `next/script`, `afterInteractive`, the equivalent of `async`), so no code change was needed. The endpoint answered 200. Claude's check sent one test pageview, `/test-from-build`.
+
+### P5 — Biomes & interiors ✅ (biome agents A/B/C plus Claude, 2026-10-18)
+**A** (commit `1ee42f1`):
+- **Hometown Meadow:** a road loop with the house (about), contact plaza, CV billboard, UFCG campus (2 markers), a skate park and the proj4me office.
+- **Downtown Plateau:** a raised grid with the Stefanini mentoring plaza and the GoFasti warehouse with an 8× snowflake and an AI kiosk. **Drive-through container loading dock.**
+- **Speed King Canyon:** a dirt stadium circuit (~240 m lap) with an asphalt start straight and gantry, berms, kickers and grandstands. **Drive-in pit garage.**
+
+**B** (commit `5837817`):
+- **Clinic Lakeside:** the Afya tower (current role, tallest), the Afya Educacional hall with antennas, the DrChrono clinic and a lake basin. **Drive-through DrChrono factory hall:** a monolith machine splitting into 3 microservice units.
+- **Desert Mesa:** **a drive-thru payments hall**, then a ramp of pads up to the FullStack tower on a 15 m mesa, with giant roadside food props.
+- **Alien Crater:** a bowl with rim jumps and the OpenMined glass hangar. **Drive-through modular-space-kit lab** (entry gate, corridors, room, laser gate, exit).
+
+**C** (commit `dc97bdb`):
+- **Game Dev Park** (night side), with one zone per itch game: a **drive-in arcade** with giant air-hockey Pong outside, the Shoot 'Em All launch pad with ships, the Rat Catcher **drive-in dungeon mound**, the lantern graveyard leading to the lighthouse cove, and the Get Notes stage. Plus a coaster loop landmark.
+- **Badlands:** kicker line, tabletop, blind hill, ridge, whoops, bowl, crater, wrecks and smashable crates.
+
+**Claude:**
+- **Import-cycle crash fixed** (found by C): the pure sphere maths moved to `planet/sphere.ts`, which has no terrain import. `frame.ts` re-exports it, and layouts must import from `sphere`/`author`.
+- Integration sandbox removed. Marker tests now use an inline fixture.
+- **New `layouts.test.ts`:** exactly one layout per biome; every job and game reachable exactly once, in its career biome; one each of about/contact/cv. **39 files, 275 tests, all green.**
+
+**Open → QA-fix agents** (running):
+- PSX label legibility (labels become smudges at 360 px)
+- Arcade/dungeon doorway stall
+- Dock ceiling renders black
+- Trails over plazas
+- Load performance
