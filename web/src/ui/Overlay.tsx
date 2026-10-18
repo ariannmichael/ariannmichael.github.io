@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, useState, type ReactNode } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
 import { links } from "@/content";
 import type { DistrictId } from "@/content/types";
 import { useAppStore } from "@/state/useAppStore";
 import WorldLoader from "@/world/WorldLoader";
+import { onIdle } from "@/world/lib/idle";
 import GpsMenu from "./GpsMenu";
 import InfoCard from "./InfoCard";
 import TouchControls from "./TouchControls";
@@ -26,10 +27,13 @@ export default function Overlay({ district }: { district: DistrictId }) {
   // reset): R3F rethrows that from <Canvas>, and we fall back exactly as if WebGL2 were missing.
   const [crashed, setCrashed] = useState(false);
   const webgl = crashed ? false : detected;
+  // Creating the WebGL context is a long main-thread task; start it only after the server-rendered
+  // overlay (name, CV, controls hint) has been painted, so it never delays first/LCP paint.
+  const painted = useAfterPresentedPaint();
 
   return (
     <>
-      {webgl === true && (
+      {webgl === true && painted && (
         <div className={styles.world}>
           <WorldBoundary onError={() => setCrashed(true)}>
             <WorldLoader district={district} />
@@ -181,4 +185,24 @@ function InteractionPrompt() {
       )}
     </div>
   );
+}
+
+/** True once a frame has been presented (two rAFs) and the browser then went idle. */
+function useAfterPresentedPaint(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancelIdle = () => {};
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        cancelIdle = onIdle(() => setReady(true), 500);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      cancelIdle();
+    };
+  }, []);
+  return ready;
 }

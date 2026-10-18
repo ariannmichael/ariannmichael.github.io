@@ -49,15 +49,10 @@ let webgl2Cache: boolean | undefined;
 /** Whether this browser can create a WebGL2 context. Cached: creating contexts is expensive. */
 export function detectWebGL2(): boolean {
   if (webgl2Cache !== undefined) return webgl2Cache;
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2");
-    webgl2Cache = !!gl;
-    // Free the probe context right away; browsers cap the number of live contexts.
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
-  } catch {
-    webgl2Cache = false;
-  }
+  // Feature check only. Creating a throwaway WebGL2 context here cost a multi-second long task on
+  // slow GPUs/software GL during hydration; if the real context still fails, the error boundary
+  // around the world (Overlay) shows the no-WebGL fallback.
+  webgl2Cache = typeof window !== "undefined" && typeof window.WebGL2RenderingContext !== "undefined";
   return webgl2Cache;
 }
 
