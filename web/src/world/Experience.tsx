@@ -13,7 +13,6 @@ import { KEYMAP } from "./controls";
 import { WheelDust } from "./fx/WheelDust";
 import { useDebugStore } from "./debug/debugStore";
 import { PLANET_LAYOUTS } from "./layout/planet";
-import { SANDBOX_LAYOUT } from "./layout/planet/_sandbox";
 import { districtOfBiome, spawnForDistrict } from "./lib/biomeMap";
 import { useAfterFirstPaint } from "./lib/idle";
 import { PlanetGravity } from "./planet/PlanetGravity";
@@ -26,8 +25,7 @@ import { Vehicle } from "./vehicle/Vehicle";
 import { DistrictTracker } from "./zones/DistrictTracker";
 import { useInteraction } from "./zones/useInteraction";
 
-// Biome agents fill PLANET_LAYOUTS; until then the integration sandbox keeps the world testable.
-const LAYOUTS = PLANET_LAYOUTS.length ? PLANET_LAYOUTS : [SANDBOX_LAYOUT];
+const LAYOUTS = PLANET_LAYOUTS;
 
 /** GPS teleports land on the spawn of the district's biome (biome centre when not authored yet) */
 const spawnFor = (d: DistrictId) => spawnForDistrict(LAYOUTS, d);
