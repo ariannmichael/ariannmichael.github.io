@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "models": "node scripts/prepare-models.mjs",
     "check": "npm run typecheck && npm run lint && npm test",
-    "cv": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-cv.mjs"
+    "cv": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-cv.mjs",
+    "roads": "ROADS_WRITE=1 vitest run src/world/planet/roadRoute.gen.test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -2,9 +2,8 @@
 //
 // Two layers:
 // 1. `naturalHeight` / `analyticHeight`: the smooth noise field (biome shapes blended by
-//    biomeField weights + a global undulation + dirt-track grooves + flat pads; trails fade out
-//    inside pads). The mesh builder
-//    samples it at every icosphere vertex.
+//    biomeField weights + a global undulation, then flat road beds (roads.ts) and flat pads,
+//    pads winning). The mesh builder samples it at every icosphere vertex.
 // 2. `terrainHeight`: the height of the *mesh* along a direction. It finds the icosphere triangle
 //    under the direction and intersects the ray with that triangle's plane, so placements, the
 //    camera and the vehicle agree exactly with what is rendered and with the Rapier trimesh.
@@ -12,14 +11,10 @@
 import type { Vector3 } from "three";
 import { PLANET_LAYOUTS } from "@/world/layout/planet";
 import { BIOMES } from "./biomes";
-import {
-  BIOME_COUNT,
-  biomeCenter,
-  biomeWeightsXYZ,
-  dominantBiomeIndexXYZ,
-} from "./biomeField";
+import { BIOME_COUNT, biomeWeightsXYZ, dominantBiomeIndexXYZ } from "./biomeField";
 import { PLANET_RADIUS } from "./config";
 import { createNoise3D, fbm, ridgedFbm, smoothstep } from "./noise";
+import { getRoads, roadBedXYZ, roadVergeXYZ, type PreparedRoad, type RoadBed } from "./roads";
 import { gridDir, locateCell, type GridCell } from "./terrainGrid";
 import type { BiomeId, FlatPad } from "./types";
 
@@ -28,7 +23,6 @@ const R = PLANET_RADIUS;
 
 const shapeNoise = createNoise3D(1009);
 const globalNoise = createNoise3D(2017);
-const trackNoise = createNoise3D(3023);
 
 // ---------------------------------------------------------------------------------------------
 // Biome shapes
@@ -80,84 +74,11 @@ function biomeShape(i: number, x: number, y: number, z: number): number {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dirt tracks: meandering trails along great-circle arcs between neighbouring biome centres.
-
-const TRACK_HALF_WIDTH = 2.6; // metres of full dirt either side of the centre line
-const TRACK_FEATHER = 1.8;
-const TRACK_MEANDER = 9; // metres of sideways wander
-const TRACK_GROOVE = 0.35; // how far tracks are worn into the ground
-
-interface Arc {
-  ax: number; ay: number; az: number;
-  // n = unit normal of the great circle; t = n × a (tangent at a, pointing toward b)
-  nx: number; ny: number; nz: number;
-  tx: number; ty: number; tz: number;
-  length: number; // radians
-}
-
-const ARCS: Arc[] = (() => {
-  // Connect each biome to its two nearest neighbours.
-  const pairs = new Set<string>();
-  for (let i = 0; i < BIOME_COUNT; i++) {
-    const ci = biomeCenter(i);
-    const others = [];
-    for (let j = 0; j < BIOME_COUNT; j++) {
-      if (j === i) continue;
-      const cj = biomeCenter(j);
-      others.push({ j, d: Math.acos(ci[0] * cj[0] + ci[1] * cj[1] + ci[2] * cj[2]) });
-    }
-    others.sort((p, q) => p.d - q.d);
-    for (const { j } of others.slice(0, 2)) pairs.add(i < j ? `${i}-${j}` : `${j}-${i}`);
-  }
-  return [...pairs].sort().map((key) => {
-    const [i, j] = key.split("-").map(Number);
-    const [ax, ay, az] = biomeCenter(i);
-    const [bx, by, bz] = biomeCenter(j);
-    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-    const nl = Math.hypot(nx, ny, nz);
-    nx /= nl; ny /= nl; nz /= nl;
-    return {
-      ax, ay, az, nx, ny, nz,
-      tx: ny * az - nz * ay,
-      ty: nz * ax - nx * az,
-      tz: nx * ay - ny * ax,
-      length: Math.acos(Math.min(1, ax * bx + ay * by + az * bz)),
-    };
-  });
-})();
-
-const TRACK_REACH = (TRACK_HALF_WIDTH + TRACK_FEATHER + TRACK_MEANDER) / R; // radians
-
-/** trackMask for raw unit-direction components. */
-export function trackMaskXYZ(x: number, y: number, z: number): number {
-  let best = 0;
-  for (let k = 0; k < ARCS.length; k++) {
-    const a = ARCS[k];
-    const side = x * a.nx + y * a.ny + z * a.nz; // sin(angle off the great circle)
-    if (side > TRACK_REACH || side < -TRACK_REACH) continue;
-    const along = Math.atan2(x * a.tx + y * a.ty + z * a.tz, x * a.ax + y * a.ay + z * a.az);
-    if (along < 0 || along > a.length) continue;
-    // Taper the wander to zero at both ends so trails arrive at the biome centres.
-    const taper = Math.sin((Math.PI * along) / a.length);
-    const wander = TRACK_MEANDER * taper * fbm(trackNoise, x * 9 + k * 13.1, y * 9, z * 9, 2);
-    const lateral = Math.abs(Math.asin(side) * R + wander);
-    const m = 1 - smoothstep(TRACK_HALF_WIDTH, TRACK_HALF_WIDTH + TRACK_FEATHER, lateral);
-    if (m > best) best = m;
-  }
-  return best;
-}
-
-/** How much of a dirt trail is at unit direction `dir` (0 = none, 1 = centre of the trail). */
-export function trackMask(dir: Vector3): number {
-  return trackMaskXYZ(dir.x, dir.y, dir.z);
-}
-
-// ---------------------------------------------------------------------------------------------
 // Natural (pad-free) height
 
 const weightScratch = new Float32Array(BIOME_COUNT);
 
-/** Noise height without trail grooves or pads. */
+/** Noise height without road beds or pads. */
 function baseHeightXYZ(x: number, y: number, z: number): number {
   // Planet-scale swell (~150 m features) so the horizon rolls.
   let h = 4 * fbm(globalNoise, x * 1.1, y * 1.1, z * 1.1, 3, 2, 0.45);
@@ -168,9 +89,9 @@ function baseHeightXYZ(x: number, y: number, z: number): number {
   return h;
 }
 
-/** Smooth noise height (metres above PLANET_RADIUS) without flat pads. Unit direction input. */
+/** Smooth noise height (metres above PLANET_RADIUS) without flat pads or road beds. Unit direction input. */
 export function naturalHeightXYZ(x: number, y: number, z: number): number {
-  return baseHeightXYZ(x, y, z) - TRACK_GROOVE * trackMaskXYZ(x, y, z);
+  return baseHeightXYZ(x, y, z);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -219,8 +140,8 @@ export function applyPads(x: number, y: number, z: number, h: number, pads: read
 }
 
 /**
- * 1 away from every pad, fading to 0 inside one (over its blend ring). Trails (their dirt colour and
- * their groove) are multiplied by it, so they stop at plazas and lawns instead of crossing them.
+ * 1 away from every pad, fading to 0 inside one (over its blend ring). The dirt verge along roads is
+ * multiplied by it, so plazas and lawns keep their own colour where a road crosses them.
  */
 export function padFadeXYZ(x: number, y: number, z: number, pads: readonly PreparedPad[]): number {
   let f = 1;
@@ -234,14 +155,15 @@ export function padFadeXYZ(x: number, y: number, z: number, pads: readonly Prepa
   return f;
 }
 
-/** Dirt-trail amount as drawn and grooved: trackMask faded out inside pads. */
-export function trailMaskXYZ(
+/** Dirt verge along the roads as drawn on the terrain: 1 under/beside a road, faded out inside pads. */
+export function vergeMaskXYZ(
   x: number,
   y: number,
   z: number,
   pads: readonly PreparedPad[] = getDefaultPads(),
+  roads: readonly PreparedRoad[] = getRoads(),
 ): number {
-  const m = trackMaskXYZ(x, y, z);
+  const m = roadVergeXYZ(x, y, z, roads);
   return m > 0 ? m * padFadeXYZ(x, y, z, pads) : 0;
 }
 
@@ -254,15 +176,38 @@ export function getDefaultPads(): PreparedPad[] {
   return defaultPads;
 }
 
-/** Smooth field height including pads: what every mesh vertex is set to. */
-export function analyticHeightXYZ(
+/** Ground height with pads but no road beds: what roadRoute.ts routes and grades the roads over. */
+export function groundHeightNoRoadsXYZ(
   x: number,
   y: number,
   z: number,
   pads: readonly PreparedPad[] = getDefaultPads(),
 ): number {
-  // Same as naturalHeightXYZ, but the groove fades out inside pads (identical with no pads)
-  return applyPads(x, y, z, baseHeightXYZ(x, y, z) - TRACK_GROOVE * trailMaskXYZ(x, y, z, pads), pads);
+  return applyPads(x, y, z, baseHeightXYZ(x, y, z), pads);
+}
+
+/** Pads keep their flat cores; across the outer part of a blend ring (fade above 1/3) the road wins */
+const ROAD_OVER_RING = 3;
+const bed: RoadBed = { weight: 0, target: 0 };
+
+/**
+ * Smooth field height including road beds and pads: what every mesh vertex is set to. Pads win in
+ * their flat cores, but a road levels any blend ring it crosses, so the asphalt never tilts sideways
+ * down a pad's rim (the bed already follows the pads' heights, so cores and road meet smoothly).
+ */
+export function analyticHeightXYZ(
+  x: number,
+  y: number,
+  z: number,
+  pads: readonly PreparedPad[] = getDefaultPads(),
+  roads: readonly PreparedRoad[] = getRoads(),
+): number {
+  const base = baseHeightXYZ(x, y, z);
+  roadBedXYZ(x, y, z, roads, bed);
+  if (bed.weight === 0) return applyPads(x, y, z, base, pads);
+  const h = applyPads(x, y, z, base + (bed.target - base) * bed.weight, pads);
+  const w = bed.weight * Math.min(1, ROAD_OVER_RING * padFadeXYZ(x, y, z, pads));
+  return h + (bed.target - h) * w;
 }
 
 // ---------------------------------------------------------------------------------------------

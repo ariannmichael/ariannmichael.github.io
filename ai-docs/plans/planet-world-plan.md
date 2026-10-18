@@ -93,6 +93,15 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [x] P5.2 Drivable interiors: lab corridors (modular-space-kit), factory hall (factory-kit), arcade hall (mini-arcade), dungeon cave (modular-dungeon/mini-dungeon), pit garage (racing-kit)
 - [x] P5.3 Off-road routes: dirt trails between biomes, jumps, the raceway circuit on terrain
 
+### Phase P5b — Post-feedback fixes (2026-10-18)
+- [x] P5b.1 Road tile alignment: `grid()` yaws are in the grid frame, not local north (tiles twisted up to ~16°)
+- [x] P5b.2 Roadmap: a paved road network linking every biome, replacing the dirt trails
+  - [x] Links: a loop home → raceway → engineering → healthcare → gamedev → financial → opensource → home, plus raceway → badlands → healthcare (`planet/roads.ts` `ROAD_LINKS`)
+  - [x] Offline router (`planet/roadRoute.ts`, `npm run roads`): A* on a 2 m strip grid between spawns. It avoids footprints, parking rings and small jump pads, penalises climbing, side slope and crowding, and smooths the result by string pulling, Chaikin and constrained relaxation. The bed is low-passed and grade-limited, and the output is baked to `roads.generated.ts`
+  - [x] Terrain: a flat road bed (blended at junctions); pads keep their cores, and roads level the pad blend rings they cross; the dirt verge colour replaces the trail colour
+  - [x] Visuals (`world/roads/`): one merged PSX asphalt ribbon with lane lines, and a two-faced sign at each road end (welcome: town and its stops; onward: destination, distance and its stops)
+  - [x] Tests: connectivity, ends near spawns, clearance, drivable grade, ribbon orientation, sign placement
+
 ### Phase P6 — QA & ship
 - [x] P6.1 Screenshot QA of every biome and interior (headless harness), plus a perf pass (draw calls, triangles, load blocking time). Camera collision in interiors is still in progress
 - [x] P6.2 Human testing doc: `ai-docs/human_testing/planet-v2-testing.md`

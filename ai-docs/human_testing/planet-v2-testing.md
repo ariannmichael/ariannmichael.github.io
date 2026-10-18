@@ -49,6 +49,13 @@ Use **GPS** (button, or **M**) to teleport to each one, then drive around.
 - [ ] The sky colour changes smoothly as you drive between biomes.
 - [ ] Nothing floats or sinks into the ground in any biome.
 
+## 3b. Roadmap (roads between biomes)
+- [ ] From any town, a paved road (grey, with white edges and a dashed yellow centre line) leads out to the neighbouring towns. Every biome is reachable by road.
+- [ ] At each road end there is a green sign. Arriving, it names the town and lists its stops. Leaving, it says "> destination", the distance and the stops there.
+- [ ] Roads are drivable at speed: no sudden steps, no sideways tilt, no terrain poking through the asphalt.
+- [ ] Roads don't run through buildings, jumps or parking rings. Sign posts are solid (you bump into them).
+- [ ] Road tiles inside towns (Hometown loop, Downtown streets, Raceway) line up straight with no twisted tiles.
+
 ## 4. Drive-in interiors
 Drive in, move around inside, and drive out. The camera should never get stuck inside a wall.
 

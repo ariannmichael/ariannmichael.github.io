@@ -11,9 +11,9 @@ import {
   naturalHeightXYZ,
   preparePads,
   terrainHeight,
-  trackMask,
-  trailMaskXYZ,
+  vergeMaskXYZ,
 } from "./terrain";
+import { getRoads, roadBedXYZ } from "./roads";
 import { groundColorAt } from "./terrainColor";
 
 const DEG = Math.PI / 180;
@@ -97,33 +97,36 @@ describe("terrainHeight", () => {
     expect(ridgedMedian).toBeLessThan(30);
   });
 
-  it("dirt tracks exist but cover only a small part of the planet", () => {
+  it("road verges exist but cover only a small part of the planet", () => {
     const rnd = mulberry32(24);
     const v = new Vector3();
     let on = 0;
     const N = 20000;
     for (let i = 0; i < N; i++) {
-      const m = trackMask(randomDir(rnd, v));
+      randomDir(rnd, v);
+      const m = vergeMaskXYZ(v.x, v.y, v.z);
       expect(m).toBeGreaterThanOrEqual(0);
       expect(m).toBeLessThanOrEqual(1);
       if (m > 0.5) on++;
     }
-    expect(on / N).toBeGreaterThan(0.01);
+    expect(on / N).toBeGreaterThan(0.002);
     expect(on / N).toBeLessThan(0.1);
   });
 
-  it("trails (colour and groove) fade out inside pads", () => {
-    const rnd = mulberry32(31);
-    const dir = new Vector3();
-    do randomDir(rnd, dir);
-    while (trackMask(dir) < 0.99);
-    const lat = Math.asin(dir.y) / DEG;
-    const lon = Math.atan2(dir.x, dir.z) / DEG;
+  it("road beds flatten the ground under a road, and the verge fades out inside pads", () => {
+    const road = getRoads()[0];
+    const k = Math.floor(road.count / 2) * 3;
+    const [x, y, z] = [road.p[k], road.p[k + 1], road.p[k + 2]];
+    // Exactly the bed (blended with any other road close by)
+    const bed = roadBedXYZ(x, y, z, getRoads(), { weight: 0, target: 0 });
+    expect(bed.weight).toBe(1);
+    expect(analyticHeightXYZ(x, y, z, [])).toBeCloseTo(bed.target, 5);
+    expect(analyticHeightXYZ(x, y, z, [], [])).toBe(naturalHeightXYZ(x, y, z));
+    const lat = Math.asin(y) / DEG;
+    const lon = Math.atan2(x, z) / DEG;
     const pads = preparePads([{ lat, lon, radius: 10, blend: 8 }]);
-    expect(trailMaskXYZ(dir.x, dir.y, dir.z, [])).toBe(trackMask(dir));
-    expect(trailMaskXYZ(dir.x, dir.y, dir.z, pads)).toBe(0);
-    // No pads: the groove is exactly the natural one
-    expect(analyticHeightXYZ(dir.x, dir.y, dir.z, [])).toBe(naturalHeightXYZ(dir.x, dir.y, dir.z));
+    expect(vergeMaskXYZ(x, y, z, [])).toBe(1);
+    expect(vergeMaskXYZ(x, y, z, pads)).toBe(0);
   });
 
   it("groundColorAt returns a palette colour without allocating when given `out`", () => {
@@ -177,6 +180,6 @@ describe("flat pads", () => {
 
   it("is a pure function of the pad list (no pads = natural height)", () => {
     expect(applyPads(dir.x, dir.y, dir.z, 3.25, [])).toBe(3.25);
-    expect(analyticHeightXYZ(dir.x, dir.y, dir.z, [])).toBe(naturalHeightXYZ(dir.x, dir.y, dir.z));
+    expect(analyticHeightXYZ(dir.x, dir.y, dir.z, [], [])).toBe(naturalHeightXYZ(dir.x, dir.y, dir.z));
   });
 });

@@ -19,6 +19,7 @@ import { latLonToDir } from "./planet/frame";
 import { useAfterFirstPaint } from "./lib/idle";
 import { PlanetGravity } from "./planet/PlanetGravity";
 import { PlanetGround } from "./planet/PlanetGround";
+import { Roads } from "./roads/Roads";
 import { PsxPipeline } from "@/world/psx";
 import { Lighting } from "./scene/Lighting";
 import { Sky } from "./scene/Sky";
@@ -144,6 +145,7 @@ export default function Experience({ district }: { district: DistrictId }) {
               >
                 <PlanetGravity />
                 <PlanetGround />
+                <Roads />
                 <PlanetTown layouts={LAYOUTS} spawn={spawn} />
                 <Vehicle spawn={spawn} spawnFor={spawnFor} />
                 {/* Gives the follow camera (outside Physics) the Rapier world for wall/roof collision */}

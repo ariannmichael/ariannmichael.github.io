@@ -8,7 +8,7 @@ import { BIOMES } from "./biomes";
 import { BIOME_COUNT, biomeWeightsXYZ, dominantBiomeIndexXYZ } from "./biomeField";
 import { PLANET_RADIUS } from "./config";
 import { createNoise3D, fbm, hash01, smoothstep } from "./noise";
-import { trailMaskXYZ } from "./terrain";
+import { vergeMaskXYZ } from "./terrain";
 
 const shadeNoise = createNoise3D(4051);
 
@@ -86,7 +86,7 @@ export function faceColor(
   if (rockT > h2) {
     c = pal.rock;
   } else {
-    const m = trailMaskXYZ(x, y, z); // no dirt across plazas/lawns (pads)
+    const m = vergeMaskXYZ(x, y, z); // dirt verge along roads (not across plazas/lawns)
     c = m > 0.25 + 0.5 * h2 ? pal.dirt : pal.ground[shadeIndex(x, y, z, pal.ground.length, (h3 - 0.5) * 0.3)];
   }
   // Tiny per-face brightness jitter: keeps big flat areas from looking like one plastic sheet.
@@ -97,13 +97,13 @@ export function faceColor(
 }
 
 /**
- * Representative ground colour at unit direction `dir` (dominant biome; dirt on tracks; no
+ * Representative ground colour at unit direction `dir` (dominant biome; dirt on road verges; no
  * slope/rock or dither). For wheel smoke/dust tinting. Linear RGB (three working space).
  */
 export function groundColorAt(dir: Vector3, out: Color = new Color()): Color {
   const b = dominantBiomeIndexXYZ(dir.x, dir.y, dir.z);
   const pal = PALETTES[b];
-  if (trailMaskXYZ(dir.x, dir.y, dir.z) > 0.5) return out.copy(pal.dirt);
+  if (vergeMaskXYZ(dir.x, dir.y, dir.z) > 0.5) return out.copy(pal.dirt);
   return out.copy(pal.ground[shadeIndex(dir.x, dir.y, dir.z, pal.ground.length, 0)]);
 }
 

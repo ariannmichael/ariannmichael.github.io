@@ -356,3 +356,56 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 - `web/src/world/layout/planet/c/helpers.ts`: `localGrid` is now an alias of `grid` (author.ts is cycle-safe since the sphere.ts split), so C biomes get the fix too.
 - `home.ts`, `engineering.ts`, `raceway.ts`, `gamedev.ts`, `badlands.ts`: spawns go through `spawn()`.
 - New `author.test.ts`: placed headings match grid directions (<0.05°) away from the anchor.
+
+### v2: roadmap road network (2026-10-18), plan step P5b.2
+**Why:** the user asked for "a road connecting all biomes, like a roadmap, to make the experiences easier to find". The old dirt trails ran centre-to-centre, meandered, cut through towns and were hard to see.
+- **New `web/src/world/planet/roads.ts`:**
+  - `ROAD_LINKS`: a loop plus a badlands branch; 9 roads, about 2 km.
+  - Runtime queries: `prepareRoads`, `getRoads`, `nearestRoadXYZ`, `roadBedXYZ` (beds blended where roads meet), `applyRoadBed`, `roadVergeXYZ`.
+  - Constants: half width 3.2 m, flat shoulder 2.5 m, feather 4 m.
+- **New `web/src/world/planet/roadRoute.ts`:** the offline router. Per link:
+  - A strip grid of 2 m cells around the spawn-to-spawn great circle.
+  - Blocked cells from `obstacles.ts`, plus the clearance.
+  - A* costs:
+    - grade² (hard cap 0.42)
+    - side slope²
+    - crowding near footprints
+  - The start/goal free area is the one that best reaches both spawns. Walled-in spawns fall back to the nearest reachable cell, or to routing in reverse.
+  - Smoothing: string pulling, per-corner Chaikin, then constrained Laplacian relaxation plus resampling every 2 m.
+  - Bed: the ground (pads, no roads) with a gaussian low-pass, then a grade limiter (≤ 0.24).
+- **New `web/src/world/planet/obstacles.ts`:** footprint circles for routing and signs:
+  - Placements, using bbox centre and radius. Flat pieces under 0.6 m and dynamic props are skipped.
+  - Parking rings.
+  - Small raised or sunken pads (jumps).
+- **New `web/src/world/planet/roads.generated.ts`:** the baked polylines and bed heights (about 43 KB). Rebake with `npm run roads` after changing links or layouts.
+- **New `web/src/world/planet/roadRoute.gen.test.ts`:** the generator entry point; skipped unless `ROADS_WRITE=1`.
+- **`web/package.json`:** `roads` script.
+- **`web/src/world/planet/terrain.ts`:**
+  - Removed the trail arcs, grooves and `trackMask*`/`trailMaskXYZ`.
+  - `analyticHeightXYZ(x, y, z, pads, roads)` order: road bed, then pads; then the road re-levels the outer part of pad blend rings, so asphalt never tilts sideways down a pad rim.
+  - New `groundHeightNoRoadsXYZ`, used by the router.
+  - New `vergeMaskXYZ`, used for colour.
+  - `naturalHeightXYZ` no longer has a groove.
+- **`web/src/world/planet/terrainColor.ts`:** dirt colour now comes from the road verge mask.
+- **New `web/src/world/roads/roadGeometry.ts`:**
+  - `buildRoadRibbon`: one indexed ribbon, 5 vertices across, `terrainHeight` + 0.14 m. Rows already paved by an earlier road are skipped at hubs, so there's no z-fighting.
+  - `roadSigns`: a spot search along the road and on either side, clear of roads and footprints.
+- **New `web/src/world/roads/Roads.tsx`:**
+  - The ribbon uses a procedural 32×64 asphalt texture (nearest filter, white edges, dashed yellow centre) with polygon offset.
+  - Each sign has two posts with colliders and a green board. Its faces, on the label layer:
+    - **Welcome:** the town name and its stops.
+    - **Onward:** "> destination", the distance and that town's stops.
+  - Signs are hidden beyond 110 m.
+- **`web/src/world/Experience.tsx`:** mounts `<Roads />` after `<PlanetGround />` inside `<Physics>`.
+- **Tests:**
+  - New `roads.test.ts`: links baked, network connected, ends near spawns, clearance, bed grade < 0.3, bed maths.
+  - New `roadGeometry.test.ts`: ribbon faces outward on the ground, signs clear and upright.
+  - `terrain.test.ts`: trail tests replaced with verge and bed tests.
+- **Known limits:**
+  - Raceway → Downtown arrives at the north side of the circuit, about 68 m from the spawn, because the berms and grandstands wall the spawn off.
+  - Badlands roads end about 36 m from its centre, at the edge of the jump field.
+  - At town hubs the asphalt meets the Kenney road tiles with a visible seam.
+- **QA:**
+  - 312 tests pass; typecheck and lint are clean; build OK.
+  - Terrain build: 60 ms geometry + 42 ms collider.
+  - Headless screenshots: roads through Game Dev Park, the desert and the clinic; the welcome and onward signs are readable.
