@@ -62,18 +62,18 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [x] P0.3 Store: `psx` flag, `setPsx`
 
 ### Phase P1 — Terrain & gravity (terrain agent)
-- [ ] P1.1 Deterministic noise (no new dependency), with per-biome terrain shapes blended smoothly at the borders
-- [ ] P1.2 Icosphere mesh (subdivision tuned so the trimesh has ≤ ~40k triangles) with vertex colours per biome (PSX-friendly flat palette) and dirt tracks/paths painted by noise
-- [ ] P1.3 One fixed trimesh collider, plus a planet gravity system (force toward the centre on every dynamic body, mass-aware)
-- [ ] P1.4 `terrainHeight(dir)` (exact enough to match the rendered mesh within ~5 cm) and `biomeAt(dir)`
-- [ ] P1.5 Flatten pads: biome layouts can request flat areas (for buildings and interiors) via `FLAT_PADS`
+- [x] P1.1 Deterministic noise (no new dependency), with per-biome terrain shapes blended smoothly at the borders
+- [x] P1.2 Icosphere mesh (subdivision tuned so the trimesh has ≤ ~40k triangles) with vertex colours per biome (PSX-friendly flat palette) and dirt tracks/paths painted by noise
+- [x] P1.3 One fixed trimesh collider, plus a planet gravity system (force toward the centre on every dynamic body, mass-aware)
+- [x] P1.4 `terrainHeight(dir)` (exact enough to match the rendered mesh within ~5 cm) and `biomeAt(dir)`
+- [x] P1.5 Flatten pads: biome layouts can request flat areas (for buildings and interiors) via `FLAT_PADS`
 
 ### Phase P2 — Off-road vehicle, camera, FX (vehicle agent)
-- [ ] P2.1 A raycast-suspension vehicle (Rapier `DynamicRayCastVehicleController`) on custom gravity, with the sedan visuals and wheel nodes driven by the suspension
-- [ ] P2.2 Arcade off-road feel: weight transfer, airtime, landing, recovery (auto-upright when flipped, plus R to reset)
-- [ ] P2.3 Follow camera with surface-normal up, terrain-aware (no clipping into hills), and camera shake (speed rumble, landing impulse, collision impulse). Respects reduced motion
-- [ ] P2.4 Wheel smoke and dust particles (instanced billboards; colour from the biome's ground; triggered by slip, burnout or dirt)
-- [ ] P2.5 Keep the existing contracts: `vehicleState`, `useInputStore`, teleport/reset semantics, and pause
+- [x] P2.1 A raycast-suspension vehicle (Rapier `DynamicRayCastVehicleController`) on custom gravity, with the sedan visuals and wheel nodes driven by the suspension
+- [x] P2.2 Arcade off-road feel: weight transfer, airtime, landing, recovery (auto-upright when flipped, plus R to reset)
+- [x] P2.3 Follow camera with surface-normal up, terrain-aware (no clipping into hills), and camera shake (speed rumble, landing impulse, collision impulse). Respects reduced motion
+- [x] P2.4 Wheel smoke and dust particles (instanced billboards; colour from the biome's ground; triggered by slip, burnout or dirt)
+- [x] P2.5 Keep the existing contracts: `vehicleState`, `useInputStore`, teleport/reset semantics, and pause
 
 ### Phase P3 — PSX + skybox (psx-sky agent)
 - [x] P3.1 Low-res render pipeline (render target at a fixed internal height, nearest upscale) with a toggle
@@ -83,10 +83,10 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [x] P3.5 Off switch for accessibility and perf, and keep frame cost low on mobile
 
 ### Phase P4 — Integration (integration agent)
-- [ ] P4.1 Planet renderer: instanced Kenney placements from `lat/lon/yaw` (reuse the current instancing, with arbitrary orientation)
-- [ ] P4.2 Zones/markers on the sphere (sensors and labels oriented to local up), district tracking by biome, teleport/spawn on the planet
-- [ ] P4.3 Wire `Experience`: planet, gravity, vehicle, PSX, sky, and biome streaming by distance
-- [ ] P4.4 UI: a PSX toggle in the HUD and quality menu, a "Classic/Smooth" option, and the Lighthouse a11y fixes (`aria-prohibited-attr`, `label-content-name-mismatch`)
+- [x] P4.1 Planet renderer: instanced Kenney placements from `lat/lon/yaw` (reuse the current instancing, with arbitrary orientation)
+- [x] P4.2 Zones/markers on the sphere (sensors and labels oriented to local up), district tracking by biome, teleport/spawn on the planet
+- [x] P4.3 Wire `Experience`: planet, gravity, vehicle, PSX, sky, and biome streaming by distance
+- [x] P4.4 UI: a PSX toggle in the HUD and quality menu, a "Classic/Smooth" option, and the Lighthouse a11y fixes (`aria-prohibited-attr`, `label-content-name-mismatch`)
 
 ### Phase P5 — Biomes & interiors (biomes agents)
 - [x] P5.1 The 8 biomes authored as data, each using distinct kits and palettes, with all markers for jobs and games
@@ -94,8 +94,8 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [x] P5.3 Off-road routes: dirt trails between biomes, jumps, the raceway circuit on terrain
 
 ### Phase P6 — QA & ship
-- [ ] P6.1 Screenshot QA of every biome and interior (headless harness), plus a perf pass (draw calls, triangles, load blocking time)
-- [ ] P6.2 Human testing doc
+- [x] P6.1 Screenshot QA of every biome and interior (headless harness), plus a perf pass (draw calls, triangles, load blocking time). Camera collision in interiors is still in progress
+- [x] P6.2 Human testing doc: `ai-docs/human_testing/planet-v2-testing.md`
 - [ ] P6.3 Merge `planet` → `main` when it beats v1 (Ariann's call)
 
 ## Open questions

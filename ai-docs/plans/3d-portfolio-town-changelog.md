@@ -329,3 +329,16 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 - Dock ceiling renders black
 - Trails over plazas
 - Load performance
+
+### P6 — QA round (2026-10-18)
+- **PSX labels** (QA agent, commit `f374291`): labels sit on layer 1 and render at full resolution after the PSX blit, depth-tested against the copied low-res scene depth. They're unfogged in PSX mode and cost about 0.08 ms per frame. Claude added growth past 60 m (×1.8 at 160 m) for the intro orbit.
+- **Interiors** (QA agent, commit `649fd4e`): every interior was driven in, through and out in the browser via a new `?debug` `window.__teleport`. The arcade and dungeon became drive-through with markers moved beside the door lanes. The dock roof now uses lit space-kit slabs, and dirt trails fade out on pads (mesh and `terrainHeight` still exact).
+  - **Root cause it found: wheel raycasts hit marker sensors.** Every zone acted as a solid 6×6×4 m block. **Claude fixed it** in `vehicle/controller.ts` (`updateVehicle(dt, EXCLUDE_SENSORS=8)`), with a regression test in the headless Rapier sim that fails without the fix (commit `a6dd216`).
+- **Performance** (QA agent, commit `f06b5e6`):
+  - Priority download queue: spawn biome first, neighbours after spawn-ready, far biomes in idle time.
+  - Groups stay hidden until `compileAsync` finishes; colliders are added 64 per frame.
+  - The loader tracks only the spawn biome; the controls hint is server-rendered; there's an error boundary around the world.
+  - **Lighthouse `/`: perf 36 → 59, LCP 15 s → 2.5 s.**
+- **WebGL probe** (Claude, commit `7f19478`): the throwaway WebGL2 context became a feature check, and the world mounts after a presented paint plus idle. **TBT 11 s → 5.5 s.** LCP under SwiftShader is bimodal (2.5 s or 11.6 s from run to run); real GPUs should do much better. That needs real-device testing.
+- **Human testing doc:** `ai-docs/human_testing/planet-v2-testing.md`.
+- **In progress:** a camera agent working on collision with buildings and interiors (the camera clipped into the dungeon mound).
