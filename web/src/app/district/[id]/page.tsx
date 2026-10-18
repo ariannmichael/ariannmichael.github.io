@@ -28,8 +28,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description: district.blurb,
       url,
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ariann Michael's 3D portfolio town" }],
     },
-    twitter: { card: "summary", title, description: district.blurb },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: district.blurb,
+      images: ["/og-image.png"],
+    },
   };
 }
 

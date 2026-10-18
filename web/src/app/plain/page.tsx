@@ -21,6 +21,12 @@ export const metadata: Metadata = {
     locale: "en_US",
     title: "Ariann Michael · Résumé",
     url: "/plain/",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Ariann Michael's 3D portfolio town" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ariann Michael · Résumé",
+    images: ["/og-image.png"],
   },
 };
 
