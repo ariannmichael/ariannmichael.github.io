@@ -99,5 +99,5 @@ Coordinator-owned contracts: `web/src/world/planet/{config,frame,types,biomes}.t
 - [ ] P6.3 Merge `planet` → `main` when it beats v1 (Ariann's call)
 
 ## Open questions
-1. Ship v1 (the flat town) **now** for the launch while v2 is built, or wait for v2?
+1. ~~Ship v1 now?~~ **Answered (2026-10-18): wait for v2 and don't ship v1.** v2 must be launch-ready before 2026-11-10.
 2. ~~Vehicle~~ **Answered:** SUV.
