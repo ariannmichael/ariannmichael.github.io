@@ -342,3 +342,10 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
 - **WebGL probe** (Claude, commit `7f19478`): the throwaway WebGL2 context became a feature check, and the world mounts after a presented paint plus idle. **TBT 11 s → 5.5 s.** LCP under SwiftShader is bimodal (2.5 s or 11.6 s from run to run); real GPUs should do much better. That needs real-device testing.
 - **Human testing doc:** `ai-docs/human_testing/planet-v2-testing.md`.
 - **In progress:** a camera agent working on collision with buildings and interiors (the camera clipped into the dungeon mound).
+- **Camera collision ✅** (camera agent plus Claude's mount):
+  - **Spring arm:** a 0.3 m sphere sweep from a pivot 2.4 m above the car, pulling in fast and easing out over ~1.3 s.
+  - **Ceiling probe:** caps the camera height under roofs.
+  - **Queries:** they skip dynamic bodies and sensors (flags 12). Cost is one ray plus one shape cast per frame, with no per-frame allocations in our code.
+  - **Wiring:** `CameraCollisionBridge`, mounted by Claude in `Experience` inside `<Physics>`, hands the Rapier world to `FollowCamera`.
+  - **Checked:** the dungeon no longer goes grey, and the car stays visible in every interior.
+  - **Tests:** 43 files, 300 tests.

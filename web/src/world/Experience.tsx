@@ -26,6 +26,7 @@ import { loadSpawnLayout, preloadInBackground } from "./town/assets";
 import { useSpawnLoad } from "./town/loadStatus";
 import { PlanetTown } from "./town/Town";
 import { Vehicle } from "./vehicle/Vehicle";
+import { CameraCollisionBridge } from "./camera/CameraCollisionBridge";
 import { DistrictTracker } from "./zones/DistrictTracker";
 import { useInteraction } from "./zones/useInteraction";
 
@@ -145,6 +146,8 @@ export default function Experience({ district }: { district: DistrictId }) {
                 <PlanetGround />
                 <PlanetTown layouts={LAYOUTS} spawn={spawn} />
                 <Vehicle spawn={spawn} spawnFor={spawnFor} />
+                {/* Gives the follow camera (outside Physics) the Rapier world for wall/roof collision */}
+                <CameraCollisionBridge />
               </Physics>
             )}
             {worldReady && <DistrictTracker onBiome={setBiome} />}

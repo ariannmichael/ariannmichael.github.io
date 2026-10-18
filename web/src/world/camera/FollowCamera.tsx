@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Vector3, type PerspectiveCamera } from "three";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAppStore } from "@/state/useAppStore";
@@ -18,6 +18,8 @@ import {
   orbitPosition,
   projectToTangent,
 } from "./cameraMath";
+import { ARM, armTargetRatio, capHeight, ceilingCap, smoothArmRatio, smoothCeilingCap } from "./armMath";
+import { probeRay, sweepArm } from "./cameraCollision";
 import { SHAKE, decayTrauma, rumbleAmount, shakeAmount, shakeOffsets, shakeState, type ShakeOffsets } from "./shake";
 
 /** Seconds after a teleport during which the camera keeps snapping (covers the interpolation frame) */
@@ -29,7 +31,14 @@ const SNAP_WINDOW = 0.15;
  * terrain and lifted when a hill blocks the view, with a speed FOV and trauma-based shake
  * (`addTrauma` in ./shake). Shake is off with prefers-reduced-motion and halved in "low" quality.
  *
+ * Solid geometry: a spring arm runs from a pivot over the car's roof to the (damped, unobstructed)
+ * follow position. Each frame one sphere sweep along it pulls the camera in fast when a wall, roof or
+ * mound is in the way and eases it back out slowly; one ray up from the pivot finds a ceiling and caps
+ * the camera's height under it (dock, pit garage, lab, dungeon). Both are Rapier queries against fixed
+ * colliders only (cars, props and sensors are skipped); see ./cameraCollision and ./armMath.
+ *
  * No props. Mount anywhere inside the <Canvas> (it doesn't need <Physics>); it reads `vehicleState`.
+ * Collision needs <CameraCollisionBridge /> mounted inside <Physics>; without it, terrain-only.
  */
 export function FollowCamera() {
   const reduced = usePrefersReducedMotion();
@@ -41,6 +50,14 @@ export function FollowCamera() {
     heading: new Vector3(0, 0, 1),
     wantPos: new Vector3(),
     wantLook: new Vector3(),
+    /** Spring arm: pivot over the car, unit direction to the free position, and the final position */
+    pivot: new Vector3(),
+    armDir: new Vector3(),
+    final: new Vector3(),
+    /** 0..1 of the arm in use (1 = nothing in the way), smoothed fast-in / slow-out */
+    armRatio: 1,
+    /** Max camera height above the car under a ceiling (Infinity in the open), smoothed */
+    ceiling: Infinity,
     right: new Vector3(),
     camUp: new Vector3(),
     shake: { x: 0, y: 0, roll: 0, yaw: 0, pitch: 0 } as ShakeOffsets,
@@ -50,6 +67,16 @@ export function FollowCamera() {
     initialized: false,
     fov: CAMERA.fov as number,
   });
+
+  // QA hook: `?debug` exposes the live camera state (arm ratio, ceiling cap) to the screenshot harness
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("debug")) return;
+    const w = window as unknown as { __cameraArm?: unknown };
+    w.__cameraArm = cam.current;
+    return () => {
+      delete w.__cameraArm;
+    };
+  }, []);
 
   useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 0.1);
@@ -73,13 +100,25 @@ export function FollowCamera() {
 
     followPosition(v.position, c.up, c.heading, v.forwardSpeed, c.wantPos);
     followLookAt(v.position, c.up, c.heading, v.forwardSpeed, c.wantLook);
+    c.pivot.copy(v.position).addScaledVector(c.up, ARM.pivotHeight);
+    // Ceiling over the car (follow mode only: the intro orbit is meant to be high)
+    if (mode !== "intro") {
+      const cap = ceilingCap(probeRay(c.pivot, c.up, ARM.ceilingProbe));
+      c.ceiling = snap ? cap : smoothCeilingCap(c.ceiling, cap, dt);
+    } else {
+      c.ceiling = Infinity;
+    }
     clampAboveTerrain(c.wantPos, CAMERA.minClearance);
     liftForLineOfSight(c.wantLook, c.wantPos, CAMERA.losClearance);
+    // Under a roof the terrain lift is moot; the ceiling wins
+    capHeight(c.wantPos, v.position, c.up, c.ceiling);
 
     if (mode === "intro") {
       c.orbitAngle += (reduced ? CAMERA.orbitSpeedReduced : CAMERA.orbitSpeed) * dt;
       orbitPosition(v.ground, v.up, c.orbitAngle, c.pos);
       c.look.copy(v.position);
+      c.final.copy(c.pos);
+      c.armRatio = 1;
       c.blend = 0;
       c.initialized = true;
       c.teleportSeen = v.teleportCount;
@@ -97,11 +136,21 @@ export function FollowCamera() {
       const ramp = 0.12 + 0.88 * smoothstep(c.blend);
       c.pos.lerp(c.wantPos, dampFactor(CAMERA.positionLambda * ramp, dt));
       c.look.lerp(c.wantLook, dampFactor(CAMERA.lookLambda * ramp, dt));
-      // The damped position can lag into a hillside: hard-clamp it too
+      // The damped position can lag into a hillside or up into a roof: hard-clamp it too
       clampAboveTerrain(c.pos, CAMERA.minClearance);
+      capHeight(c.pos, v.position, c.up, c.ceiling);
+
+      // Spring arm: sweep from the pivot to the free position, sit short of the first obstacle
+      c.armDir.copy(c.pos).sub(c.pivot);
+      const length = c.armDir.length();
+      if (length > 1e-4) c.armDir.divideScalar(length);
+      const target = armTargetRatio(sweepArm(c.pivot, c.armDir, length), length);
+      c.armRatio = snap ? target : smoothArmRatio(c.armRatio, target, length, dt);
+      c.final.copy(c.pivot).addScaledVector(c.armDir, length * c.armRatio);
+      clampAboveTerrain(c.final, CAMERA.minClearance);
     }
 
-    camera.position.copy(c.pos);
+    camera.position.copy(c.final);
     // During the intro blend, the up vector eases from the orbit's to the car's (same here: both local)
     camera.up.copy(c.up);
     camera.lookAt(c.look);
