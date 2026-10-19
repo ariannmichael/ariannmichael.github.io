@@ -100,6 +100,13 @@ Feedback received during S3. Agents are capped at 3 running at once.
   - [x] Final screenshot QA of all 8 towns, interiors, hubs and the healthcare approach: no blockers (changelog "Final QA")
   - [x] Dusk pattern: the cozy-pass grain hash (the classic sin hash makes a diagonal lattice, weighted 3× on dark pixels); replaced with the Hoskins hash
   - [x] Changelog and testing doc updated; committed on `planet`
+- [ ] S4.13 Publish (go-live) to `ariannmichael.github.io`:
+  - [x] committed on `planet` (`d1155ae`, then `8ea32f2`: the root layout props are typed by hand, because a clean checkout failed typecheck on Next's generated `LayoutProps`)
+  - [x] clean-clone rehearsal of the deploy workflow (`npm ci`, typecheck, lint, 487 tests, build with 13 static pages) passes
+  - [x] remote `origin` added; the merge commit is prepared locally as branch `release-merge` (`15350a2`: the planet tree, with `origin/main` (old site) and `planet` as parents, so the push is a fast-forward, no force)
+  - [ ] switch Pages to Actions: `gh api -X PUT repos/ariannmichael/ariannmichael.github.io/pages -f build_type=workflow` (denied by the auto-mode classifier as a production deploy; waiting for the user)
+  - [ ] `git push origin release-merge:main`, then watch the Actions run and load https://ariannmichael.github.io/
+  - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`, source `main` or `legacy-site`
 - [ ] S4.12 Follow-ups from the final QA (not blockers; after the first publish):
   - [ ] Alien Crater lab east exit: steep slope tips the car (upDot 0.67 at 20 km/h), likely where the exit gate meets the terrain in `opensource.ts`
   - [ ] Healthcare approach crest: the car tips about 28° at about 30 km/h and briefly drops to 2–3 wheels on the ground (it stays grounded); soften the crest in the hall-approach pad in `healthcare.ts`
