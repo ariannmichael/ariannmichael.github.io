@@ -103,7 +103,7 @@ Feedback received during S3. Agents are capped at 3 running at once.
 - [ ] S4.13 Publish (go-live) to `ariannmichael.github.io`:
   - [x] committed on `planet` (`d1155ae`, then `8ea32f2`: the root layout props are typed by hand, because a clean checkout failed typecheck on Next's generated `LayoutProps`)
   - [x] clean-clone rehearsal of the deploy workflow (`npm ci`, typecheck, lint, 487 tests, build with 13 static pages) passes
-  - [x] remote `origin` added; the merge commit is prepared locally as branch `release-merge` (`15350a2`: the planet tree, with `origin/main` (old site) and `planet` as parents, so the push is a fast-forward, no force)
+  - [x] remote `origin` added; the merge commit is prepared locally as branch `release-merge` (`f2a507c`: the planet tree, with `origin/main` (old site) and `planet` as parents, so the push is a fast-forward, no force)
   - [ ] switch Pages to Actions: `gh api -X PUT repos/ariannmichael/ariannmichael.github.io/pages -f build_type=workflow` (denied by the auto-mode classifier as a production deploy; waiting for the user)
   - [ ] `git push origin release-merge:main`, then watch the Actions run and load https://ariannmichael.github.io/
   - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`, source `main` or `legacy-site`
