@@ -665,6 +665,14 @@ Plan: `ai-docs/plans/planet-world-plan.md`.
   - Steep exit slopes at the financial hall, arcade and dungeon.
   - Gamedev spawn-back camera right behind a boulder.
 
+### Site icon: back to the old logo (2026-10-19)
+**Why:** user request on 2026-10-19: "change the website icon to use the older one". The tab icon was still the Next.js scaffold `favicon.ico`.
+- The old site's icon was `assets/Logo.svg` (a purple `#544E68` circle with a cream `#FFECD6` "A"), recovered from the `legacy-v1` tag.
+- `web/src/app/icon.svg`: the old logo as the SVG icon for modern browsers.
+- `web/src/app/favicon.ico`: a 3-size `.ico` (16, 32 and 48 px, PNG payloads) drawn from that SVG, for browsers that ask for `/favicon.ico`.
+- `web/src/app/apple-icon.png`: 180×180, the "A" on a full-bleed purple square, because iOS fills transparency with black and rounds the corners itself. This replaces the earlier crop of the og-image scene.
+- The page head carries the `icon` (ico and svg) and `apple-touch-icon` links. The build generates 14 static pages, including `/icon.svg`.
+
 ### S4.11: Mobile (2026-10-19)
 **Why:** user request on 2026-10-19: "make it possible to be seen and played in mobile". Tested with emulated phones (iPhone 390×844 portrait and 844×390 landscape, Android 360×740, tablet 768×1024) using touch events and a 4× CPU throttle. Screenshots are in the session scratchpad under `mobile/shots/`.
 - **Page basics:** `layout.tsx` exports `viewport.themeColor`; the home and district pages add `maximumScale: 1` and `userScalable: false` (not `/plain/`, which stays pinch-zoomable). `AppShell.module.css`: `height: 100dvh`, `overscroll-behavior: none`, `touch-action: manipulation` (`none` on the canvas wrapper), and no selection, callout or tap highlight. iOS Safari ignores `user-scalable`, so `touch-action: none` on the canvas and controls is the real protection there.
