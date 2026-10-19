@@ -25,6 +25,18 @@ const s = site(HEALTHCARE_CENTER);
 const H_HALL = -3.14;
 const H_MED = -4.75;
 
+/** Hall approach pads (north, east, height, radius?, blend?), spawn → south door, then the line south of the door */
+const APPROACH: [number, number, number, number?, number?][] = [
+  [-16.2, 12.5, -0.1, 3.4, 2.4],
+  [-15.6, 11, 0.12, 2.4, 1.6],
+  [-14.4, 13.5, -0.3, 2, 1.6],
+  [-14, 16, -0.6, 2, 2],
+  [-17, 18, -0.82, 3.2, 3],
+  [-17, 22, -1.2, 3.5, 3],
+  [-21, 22, -0.54, 3, 3],
+  [-13.5, 22, -1.46, 2, 2],
+];
+
 /** Spawn (anchor-frame north, east): on the plaza's south edge, two road lanes open SW and SE. */
 export const HEALTHCARE_SPAWN: [number, number] = [-18, 0];
 
@@ -178,15 +190,15 @@ export const healthcareLayout: BiomeLayout = {
     s.pad(2, 0, 9, { blend: 6, height: 0.4 }), // Afya plaza and tower
     s.pad(24, 12, 7.5, { blend: 4, height: 4.5 }), // clinic, raised out of the lakeside hollow
     s.pad(LAKE[0], LAKE[1], 6, { blend: 5, height: -1.5 }), // lake basin
-    // Hall approach: fills the gap between the spawn pad's ring and the hall pad's ring (≈ −3.1 m, the
-    // spawn's level). The hall pad is planar, so its ring rises toward the tangent plane (~1.5 m up at
-    // the south door); without this the drive in climbed a natural knoll, steepened by the road bed's
-    // feather, straight into that rim. Now it is one steady ramp up to the door.
-    s.pad(-16, 14, 5, { blend: 6, height: -1.2 }),
     // Planar floors last, so their flat cores win
     s.pad(-4, -26, 10, { blend: 8, height: H_MED, planar: true }), // med school
     // factory hall: the radius reaches past the floor's corners (15.6 m out), so they stay on the plane
     s.pad(0, 22, 16.5, { blend: 7, height: H_HALL, planar: true }),
+    // Hall approach, cut through the hall pad's ring. The planar floor rises off the sphere (~0.8 m
+    // between the door and the ring's rim), so a drive in from the spawn level (-3.1 m) climbed that
+    // crest and dropped back to the door. These pads come after the hall pad and hold a steady grade
+    // from the spawn up to the door (-2.5 m); `height` is metres from the natural ground at each centre.
+    ...APPROACH.map(([n, e, height, radius = 3.5, blend = 5]) => s.pad(n, e, radius, { blend, height })),
   ],
   markers: [
     s.marker(0, -2, { id: "afya-2026", kind: "job", label: "Afya · Current role" }),

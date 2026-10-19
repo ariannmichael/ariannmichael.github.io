@@ -39,7 +39,7 @@ const pad = (n: number, e: number, radius: number, rest: Omit<FlatPad, "lat" | "
 // Gate plaza + spawn (north). The park gate is a drive-through arch, so it has no collider.
 // The gate's east leg stands on the arcade hall pad's blend ring, ~1.3 m below the plaza: it is sunk to
 // meet it (the west leg's plinth goes into the plaza).
-P(11, 0, { model: "coaster-kit/park-entrance", collider: "none", y: -1.35 });
+P(9, 0, { model: "coaster-kit/park-entrance", collider: "none", y: -1.8 });
 P(21, -13, { model: "fantasy-town/stall-red", yaw: 90, y: -0.4 }); // north of the stage, off the plaza
 P(-2, 5, { model: "mini-characters/character-female-a", yaw: 140, anim: "emote-yes", y: -0.15 });
 P(36, 0, { model: "coaster-kit/tree-large", yaw: 30 }); // between the two road lanes
@@ -195,6 +195,15 @@ const pads: FlatPad[] = [
   pad(S.n, S.e, 11, { blend: 5, planar: true, height: 0.5 }),
   // Dungeon mound: a raised, planar earth pad the cave sits in
   pad(D.n, D.e, 17, { height: 1, blend: 5, planar: true }),
+  // Dungeon south exit: the basin wall behind the mound climbs 0.7+ per metre right where the pad's ring
+  // ends (the car tipped to upDot 0.75). A ramp of pads carries the floor up from the doorway at about
+  // 0.4 grade over 10 m instead, so the climb is spread out (heights are relative to the natural ground,
+  // measured with the probe; each pad's reach stays inside the 46 m town pad budget).
+  pad(-36, -1, 2, { blend: 3, height: 0.5 - -0.46 }),
+  pad(-38, -1, 2.5, { blend: 5.4, height: 1.1 - 0.08 }),
+  pad(-40, -1, 2, { blend: 3.9, height: 1.8 - 0.85 }),
+  pad(-42, -1, 1.5, { blend: 2.4, height: 2.6 - 1.82 }),
+  pad(-43.5, -1, 1, { blend: 1.4, height: 3.5 - 2.69 }),
   // Graveyard trail and lighthouse bluff
   pad(-11, -17, 8, { blend: 6 }),
   pad(-23, -25, 5, { height: 1, blend: 6 }),
