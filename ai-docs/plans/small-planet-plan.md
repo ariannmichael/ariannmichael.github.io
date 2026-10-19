@@ -100,13 +100,13 @@ Feedback received during S3. Agents are capped at 3 running at once.
   - [x] Final screenshot QA of all 8 towns, interiors, hubs and the healthcare approach: no blockers (changelog "Final QA")
   - [x] Dusk pattern: the cozy-pass grain hash (the classic sin hash makes a diagonal lattice, weighted 3× on dark pixels); replaced with the Hoskins hash
   - [x] Changelog and testing doc updated; committed on `planet`
-- [ ] S4.13 Publish (go-live) to `ariannmichael.github.io`:
-  - [x] committed on `planet` (`d1155ae`, then `8ea32f2`: the root layout props are typed by hand, because a clean checkout failed typecheck on Next's generated `LayoutProps`)
-  - [x] clean-clone rehearsal of the deploy workflow (`npm ci`, typecheck, lint, 487 tests, build with 13 static pages) passes
-  - [x] remote `origin` added; the merge commit is prepared locally as branch `release-merge` (`f2a507c`: the planet tree, with `origin/main` (old site) and `planet` as parents, so the push is a fast-forward, no force)
-  - [ ] switch Pages to Actions: `gh api -X PUT repos/ariannmichael/ariannmichael.github.io/pages -f build_type=workflow` (denied by the auto-mode classifier as a production deploy; waiting for the user)
-  - [ ] `git push origin release-merge:main`, then watch the Actions run and load https://ariannmichael.github.io/
-  - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`, source `main` or `legacy-site`
+- [x] S4.13 Published (go-live) to https://ariannmichael.github.io/ on 2026-10-19:
+  - [x] Pages switched to `build_type=workflow` (run by the user; the auto-mode classifier blocks production deploys from the agent)
+  - [x] first push (`5c2454b..7902466`, a fast-forward merge of the old `main` with the `planet` tree, no force-push): the workflow failed at `npm ci` (`Missing: @emnapi/runtime@1.11.3 from lock file`; the lock only had nested 1.10.0 copies), nothing deployed
+  - [x] fix: `@emnapi/core` and `@emnapi/runtime` added as dev dependencies (`40147da`); second push (`7902466..40147da`) deployed: install, typecheck, lint, 487 tests, build and deploy all green
+  - [x] verified live: `/`, `/plain/`, `/district/raceway/`, the CV PDF, the apple icon and the tractor sample return 200; headless Chrome loads desktop 1280×800 and phone 390×844 with a canvas, no console errors and no failed requests
+  - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`
+  - Future deploys: commit on `planet`, then push to `main` (the live `main` has the merge history, so build the next push on top of `origin/main` or merge `planet` into it)
 - [ ] S4.12 Follow-ups from the final QA (not blockers; after the first publish):
   - [ ] Alien Crater lab east exit: steep slope tips the car (upDot 0.67 at 20 km/h), likely where the exit gate meets the terrain in `opensource.ts`
   - [ ] Healthcare approach crest: the car tips about 28° at about 30 km/h and briefly drops to 2–3 wheels on the ground (it stays grounded); soften the crest in the hall-approach pad in `healthcare.ts`
