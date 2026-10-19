@@ -1,0 +1,90 @@
+.loader {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-6));
+  z-index: 15;
+  width: min(340px, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  transition: opacity 500ms ease 400ms, transform 500ms ease 400ms;
+}
+
+.loader[data-done="true"] {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+
+.label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Asphalt road with a dashed centre line. */
+.track {
+  position: relative;
+  height: 18px;
+  margin: 10px 18px 0 8px;
+  background: #3b3f47;
+  border-radius: 999px;
+  box-shadow: inset 0 2px 0 rgb(0 0 0 / 0.3);
+}
+
+.track::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(90deg, #f4d35e 0 8px, transparent 8px 16px);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+.car {
+  position: absolute;
+  bottom: 6px;
+  transform: translateX(-50%);
+  transition: left 300ms ease;
+  animation: bob 380ms ease-in-out infinite alternate;
+}
+
+.car svg {
+  display: block;
+}
+
+.flag {
+  position: absolute;
+  right: -18px;
+  bottom: 2px;
+  font-size: 16px;
+}
+
+@keyframes bob {
+  to {
+    translate: 0 -2px;
+  }
+}
+
+/* Touch portrait: the bottom edge belongs to the stick and buttons, and "Tap to drive" sits above them */
+@media (pointer: coarse) and (max-width: 520px) and (orientation: portrait) {
+  .loader {
+    bottom: calc(env(safe-area-inset-bottom) + 344px);
+  }
+}

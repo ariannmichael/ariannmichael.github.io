@@ -1,0 +1,282 @@
+/* HUD juice: speedometer, trick popups, district stamp. Layer 10 (HUD), below dialogs (50).
+   Everything here ignores pointer events: it's feedback, never something to click. */
+
+/* The arcade font the 3D labels already use. Only downloaded once text in it renders (after the
+   car starts driving), so it costs nothing on first load. */
+@font-face {
+  font-family: "Kenney Mini Square Mono";
+  src: url("/fonts/kenney-mini-square-mono.ttf") format("truetype");
+  font-display: swap;
+}
+
+.center,
+.speedo {
+  --hud-font: "Kenney Mini Square Mono", var(--font-mono);
+  --hud-ink: #1d1b16;
+}
+
+/* ---------- Centre column: district stamp, then trick popups ---------- */
+.center {
+  position: absolute;
+  left: 50%;
+  /* Clear of the top bar (brand + HUD), above the car */
+  top: max(calc(env(safe-area-inset-top) + 150px), 20vh);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Phones: the top bar wraps onto two rows */
+@media (max-width: 640px) {
+  .center {
+    top: max(calc(env(safe-area-inset-top) + 130px), 18vh);
+  }
+}
+
+@media (max-height: 500px) {
+  .center {
+    top: calc(env(safe-area-inset-top) + 64px);
+  }
+}
+
+.toastRegion,
+.popups {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* ---------- Trick popups ---------- */
+.popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  font-family: var(--hud-font);
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: #ffd23f;
+  /* Chunky ink outline + drop: readable over sky, sand and snow alike */
+  -webkit-text-stroke: 2px var(--hud-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--hud-ink);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.popup[data-tone="air"] {
+  color: #6fd0ff;
+}
+
+.popup[data-tone="nice"] {
+  color: #7ee08a;
+}
+
+.popup[data-tone="crash"] {
+  color: #ff5a3c;
+}
+
+.popupTitle {
+  font-size: clamp(1.75rem, 7vw, 3rem);
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.popupDetail {
+  margin-top: 6px;
+  font-size: clamp(0.95rem, 3.4vw, 1.25rem);
+  color: #fff;
+  -webkit-text-stroke-width: 1.5px;
+  text-shadow: 0 3px 0 var(--hud-ink);
+}
+
+/* ---------- District discovered stamp ---------- */
+.stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  color: var(--text);
+  text-align: center;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(var(--overlay-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--overlay-blur)) saturate(1.2);
+  border: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 4px 0 color-mix(in srgb, var(--accent) 60%, #000);
+  /* Rubber stamps never land straight (the animation ends on the same angle) */
+  transform: rotate(-4deg);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.stamp[data-complete="true"] {
+  border-color: var(--success);
+  box-shadow: var(--shadow), 0 4px 0 color-mix(in srgb, var(--success) 60%, #000);
+}
+
+.stampKicker {
+  font-family: var(--hud-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.stamp[data-complete="true"] .stampKicker {
+  color: color-mix(in srgb, var(--success) 75%, var(--text));
+}
+
+.stampName {
+  max-width: 100%;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.stampProgress {
+  padding: 1px 10px;
+  font-family: var(--hud-font);
+  font-size: var(--text-sm);
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+/* ---------- Speedometer (bottom right) ---------- */
+.speedo {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + var(--space-3));
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
+  z-index: 10;
+  min-width: 132px;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  /* A dark dashboard in both themes: the digits have to read at a glance over any biome */
+  color: #f3eee4;
+  background: color-mix(in srgb, #15140f 80%, transparent);
+  border: 2px solid #3a362c;
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.3), 0 3px 0 #000;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 300ms ease, transform 300ms ease, visibility 0s linear 0s;
+}
+
+.speedo[data-visible="false"] {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 300ms ease, transform 300ms ease, visibility 0s linear 300ms;
+}
+
+.speedoTop {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.gear {
+  align-self: center;
+  padding: 1px 4px;
+  font-family: var(--hud-font);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: #b3ab9b;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+}
+
+.gear[data-reverse] {
+  color: #ffb020;
+}
+
+.speedoNumber {
+  font-family: var(--hud-font);
+  font-size: 2.25rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 #000;
+  transition: color 150ms ease;
+}
+
+.speedoLead {
+  opacity: 0.22;
+}
+
+.speedo[data-redline] .speedoNumber {
+  color: #ff6a3d;
+}
+
+.speedoUnit {
+  font-family: var(--hud-font);
+  font-size: var(--text-xs);
+  color: #b3ab9b;
+}
+
+.speedoBar {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  height: 9px;
+  margin-top: 6px;
+}
+
+.segment {
+  background: rgb(255 255 255 / 0.14);
+  border-radius: 1px;
+  transform: skewX(-14deg);
+}
+
+.segment[data-on] {
+  background: #6fdc7a;
+}
+
+.segment:nth-child(n + 7)[data-on] {
+  background: #ffd23f;
+}
+
+.segment:nth-child(n + 10)[data-on] {
+  background: #ff5a3c;
+}
+
+/* Touch: the stick and buttons own the bottom edge; sit just above the button cluster. */
+@media (pointer: coarse) {
+  .speedo {
+    bottom: calc(env(safe-area-inset-bottom) + 196px);
+    min-width: 104px;
+    padding: 4px var(--space-2) 6px;
+  }
+
+  .speedoNumber {
+    font-size: 1.5rem;
+  }
+
+  .speedoBar {
+    height: 6px;
+    margin-top: 4px;
+  }
+}
+
+/* Landscape phones: the middle of the bottom edge is free (stick left, buttons right). */
+@media (pointer: coarse) and (max-height: 500px) {
+  .speedo {
+    right: auto;
+    left: calc(50% - 52px);
+    bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
+    width: 104px;
+  }
+}

@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+
+# Godot (optional level editor)
+level/.godot/
+level-export/
+
+# Local scratch
+*.log
+/package-lock.json
