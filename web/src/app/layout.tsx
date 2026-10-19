@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { links, profile } from "@/content";
@@ -64,7 +65,8 @@ const personJsonLd = {
   sameAs: [links.github, links.linkedin, links.itch, links.steam],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// Typed by hand: Next's generated LayoutProps only exists after a dev/build run, and CI typechecks first
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
