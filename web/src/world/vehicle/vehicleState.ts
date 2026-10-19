@@ -47,6 +47,10 @@ export const vehicleState = {
   /** Bumped on each landing after real airtime; `landingSpeed` is the vertical impact (m/s) */
   landingCount: 0,
   landingSpeed: 0,
+  /** Driver input this step: throttle −1..1 (negative = brake/reverse), steer −1..1 (+ = right), handbrake */
+  throttle: 0,
+  steer: 0,
+  handbrake: false,
   /** Rapier handle of the chassis body, used by sensors to recognise the car. -1 until mounted. */
   bodyHandle: -1,
   /** Bumped on every teleport/reset so the camera can snap instead of flying around the planet */

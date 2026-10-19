@@ -22,11 +22,14 @@ import { groupByModel } from "./group";
 import { ModelErrorBoundary } from "./ModelErrorBoundary";
 import { ModelGroupView, Placeholders } from "./ModelGroupView";
 
-// --- Streaming tuning (degrees of arc; 1° ≈ 2.6 m on the 150 m planet) -------------------------
-// From the car the horizon is ~20–35° away (camera height + hills), so anything past ~60° from a
-// layout's edge can't be seen. Load a margin earlier (≈ 4 s at top speed), unload later (hysteresis).
-export const STREAM_LOAD_DEG = 70;
-export const STREAM_UNLOAD_DEG = 90;
+// --- Streaming tuning (degrees of arc; 1° ≈ 1.6 m on the 90 m planet) -------------------------
+// Angles, not metres: the small planet curves away fast, so from the car the ground horizon is ~18°
+// off and a 15 m building pokes over it up to ~50° away. Load ~35° (≈ 55 m, ~2 s at top speed)
+// before that, unload 20° later (hysteresis). From the intro's globe view (see camera/cameraMath)
+// the camera sees ~80° around the spawn, so the same radius also fills the visible face of the
+// globe: the spawn town and its 4 antiprism neighbours, plus any town whose edge is within 85°.
+export const STREAM_LOAD_DEG = 85;
+export const STREAM_UNLOAD_DEG = 105;
 const STREAM_CHECK_INTERVAL = 0.5;
 /** Model groups mounted per frame while a biome streams in (spreads instancing over frames) */
 const GROUPS_PER_FRAME = 3;

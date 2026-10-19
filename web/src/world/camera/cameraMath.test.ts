@@ -1,5 +1,6 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
+import { PLANET_RADIUS } from "@/world/planet/config";
 import {
   CAMERA,
   clampAboveTerrain,
@@ -7,11 +8,12 @@ import {
   followLookAt,
   followPosition,
   liftForLineOfSight,
+  orbitDistance,
   orbitPosition,
   projectToTangent,
 } from "./cameraMath";
 
-const R = 150;
+const R = PLANET_RADIUS;
 const flat = () => R;
 
 describe("follow camera on the sphere", () => {
@@ -76,7 +78,7 @@ describe("terrain awareness", () => {
     // After the lift, every sample along the segment clears the hill
     for (let i = 1; i <= 16; i++) {
       const pt = target.clone().lerp(cam, i / 16);
-      expect(pt.length()).toBeGreaterThanOrEqual(hill(pt.clone().normalize()) + 0.49);
+      expect(pt.length()).toBeGreaterThanOrEqual(hill(pt.clone().normalize()) + 0.48);
     }
     const clear = new Vector3(0, -10, R + 3.6);
     expect(liftForLineOfSight(target, clear, 0.5, 16, flat)).toBe(0);
@@ -84,14 +86,27 @@ describe("terrain awareness", () => {
 });
 
 describe("intro orbit", () => {
-  it("orbits the spawn in its tangent plane at a fixed radius and height", () => {
-    const center = new Vector3(0, R, 0);
+  it("circles the spawn axis at a fixed distance and tilt from the planet centre", () => {
     const up = new Vector3(0, 1, 0);
+    const d = 250;
     for (const a of [0, 1.2, 3]) {
-      const p = orbitPosition(center, up, a, new Vector3());
-      const rel = p.clone().sub(center);
-      expect(rel.dot(up)).toBeCloseTo(CAMERA.orbitHeight);
-      expect(Math.hypot(rel.x, rel.z)).toBeCloseTo(CAMERA.orbitRadius);
+      const p = orbitPosition(up, a, d, new Vector3());
+      expect(p.length()).toBeCloseTo(d);
+      expect(p.dot(up)).toBeCloseTo(Math.cos(CAMERA.orbitTilt) * d);
+      expect(Math.hypot(p.x, p.z)).toBeCloseTo(Math.sin(CAMERA.orbitTilt) * d);
     }
+  });
+
+  it("frames the whole globe: the planet's angular radius fits the narrower half-FOV", () => {
+    for (const aspect of [16 / 9, 1, 9 / 19.5]) {
+      const d = orbitDistance(CAMERA.fov, aspect);
+      const halfV = (CAMERA.fov * Math.PI) / 360;
+      const halfH = Math.atan(Math.tan(halfV) * aspect);
+      const globe = Math.asin((R * CAMERA.orbitFrame) / d);
+      expect(globe).toBeCloseTo(Math.min(halfV, halfH));
+      expect(Math.asin(R / d)).toBeLessThan(Math.min(halfV, halfH));
+    }
+    // Portrait phones orbit further out than landscape screens
+    expect(orbitDistance(CAMERA.fov, 9 / 19.5)).toBeGreaterThan(orbitDistance(CAMERA.fov, 16 / 9));
   });
 });

@@ -81,3 +81,10 @@
     translate: 0 -2px;
   }
 }
+
+/* Touch portrait: the bottom edge belongs to the stick and buttons, and "Tap to drive" sits above them */
+@media (pointer: coarse) and (max-width: 520px) and (orientation: portrait) {
+  .loader {
+    bottom: calc(env(safe-area-inset-bottom) + 344px);
+  }
+}

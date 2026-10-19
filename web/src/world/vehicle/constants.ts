@@ -1,5 +1,5 @@
 // Vehicle tuning. Everything that changes how the car feels lives here.
-// Units: metres, seconds, radians, kg, newtons. Speeds in m/s (25 m/s = 90 km/h, fast on a 150 m planet).
+// Units: metres, seconds, radians, kg, newtons. Speeds in m/s (25 m/s = 90 km/h, fast on a 90 m planet).
 //
 // The car is a Rapier DynamicRayCastVehicleController: a dynamic chassis box with four ray-cast wheels.
 // Rapier's suspension force is `stiffness × compression × chassisMass` (per wheel), so the spring and

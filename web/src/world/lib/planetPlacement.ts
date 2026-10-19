@@ -1,8 +1,8 @@
 // Pure placement math on the planet: lat/lon/yaw placements -> world matrices and oriented collider boxes.
 // Every pose comes from planet/frame.ts `surfacePose`: model +Y = local up (radial), +Z = heading.
-import { Matrix4, Vector3 } from "three";
-import { surfacePose, type Pose } from "@/world/planet/frame";
-import type { PlanetMarker, PlanetPlacement } from "@/world/planet/types";
+import { Matrix4, Quaternion, Vector3 } from "three";
+import { headingAt, latLonToDir, surfaceFrame, surfacePose, surfaceRadius, type Pose } from "@/world/planet/frame";
+import type { LatLon, PlanetMarker, PlanetPlacement } from "@/world/planet/types";
 import { localColliderBox, type Vec3 } from "./placement";
 
 export type Quat4 = [number, number, number, number];
@@ -15,10 +15,29 @@ const poseCache = new WeakMap<object, Pose>();
 export function placementPose(p: PlanetPlacement): Pose {
   let pose = poseCache.get(p);
   if (!pose) {
-    pose = surfacePose(p.lat, p.lon, p.yaw ?? 0, p.y ?? 0);
+    pose = p.plane ? planePose(p, p.plane) : surfacePose(p.lat, p.lon, p.yaw ?? 0, p.y ?? 0);
     poseCache.set(p, pose);
   }
   return pose;
+}
+
+/**
+ * Pose on the tangent plane through `anchor` (the centre of a planar pad): the point is where the
+ * ray along the placement's direction meets the plane, up is the anchor's up, and the heading is the
+ * placement's (local) heading projected onto the plane. `y` lifts along the anchor's up.
+ */
+function planePose(p: PlanetPlacement, anchor: LatLon): Pose {
+  const n = latLonToDir(anchor.lat, anchor.lon);
+  const level = surfaceRadius(n); // planar pad: the plane's distance from the centre
+  const dir = latLonToDir(p.lat, p.lon);
+  const position = dir.clone().multiplyScalar(level / Math.max(dir.dot(n), 0.5)).addScaledVector(n, p.y ?? 0);
+  const heading = headingAt(surfaceFrame(dir), p.yaw ?? 0);
+  const forward = heading.addScaledVector(n, -heading.dot(n)).normalize();
+  const right = new Vector3().crossVectors(n, forward).normalize();
+  return {
+    position,
+    quaternion: new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(right, n, forward)),
+  };
 }
 
 const _scale = new Vector3();

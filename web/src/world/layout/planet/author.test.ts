@@ -8,7 +8,7 @@ describe("grid", () => {
   it("keeps yaw in the grid frame, so tiles in a row line up away from the anchor", () => {
     for (const center of [{ lat: 25, lon: 75 }, { lat: -65, lon: 60 }]) {
       const g = grid(center);
-      for (const [n, e] of [[0, 48], [48, 48], [-48, -48]]) {
+      for (const [n, e] of [[0, 30], [30, 30], [-30, -30]]) {
         for (const yaw of [0, 90, -90]) {
           const p = g.place(n, e, { model: "city-roads/road-straight", yaw });
           const h = headingAt(surfaceFrame(dir(p)), p.yaw!);

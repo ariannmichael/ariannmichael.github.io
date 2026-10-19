@@ -14,6 +14,11 @@ export interface ModalProps {
   /** "side": right panel / bottom sheet that keeps the car visible. "center": menus. "full": game player. */
   placement?: "side" | "center" | "full";
   className?: string;
+  /**
+   * Playing the quick exit animation: the owner keeps the dialog mounted for a moment after closing.
+   * It's inert meanwhile, so focus and clicks can't land in a dialog that is on its way out.
+   */
+  closing?: boolean;
 }
 
 /**
@@ -21,7 +26,14 @@ export interface ModalProps {
  * Esc and a click on the backdrop close it, and focus returns to the opener on close.
  * Keyboard events are stopped here so a nested modal only closes itself.
  */
-export default function Modal({ labelledBy, onClose, children, placement = "side", className }: ModalProps) {
+export default function Modal({
+  labelledBy,
+  onClose,
+  children,
+  placement = "side",
+  className,
+  closing = false,
+}: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Keep the latest onClose without re-running the focus effect on every render.
   const onCloseRef = useRef(onClose);
@@ -76,6 +88,8 @@ export default function Modal({ labelledBy, onClose, children, placement = "side
     <div
       className={styles.backdrop}
       data-placement={placement}
+      data-closing={closing || undefined}
+      inert={closing || undefined}
       data-testid="modal-backdrop"
       // Only a click on the backdrop itself (not bubbling from the panel) closes.
       onClick={(e) => {

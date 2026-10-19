@@ -15,21 +15,34 @@ import {
   followLookAt,
   followPosition,
   liftForLineOfSight,
+  orbitDistance,
   orbitPosition,
   projectToTangent,
 } from "./cameraMath";
 import { ARM, armTargetRatio, capHeight, ceilingCap, smoothArmRatio, smoothCeilingCap } from "./armMath";
 import { probeRay, sweepArm } from "./cameraCollision";
-import { SHAKE, decayTrauma, rumbleAmount, shakeAmount, shakeOffsets, shakeState, type ShakeOffsets } from "./shake";
+import {
+  SHAKE,
+  decayTrauma,
+  resetFovPunch,
+  rumbleAmount,
+  shakeAmount,
+  shakeOffsets,
+  shakeState,
+  stepFovPunch,
+  type ShakeOffsets,
+} from "./shake";
 
 /** Seconds after a teleport during which the camera keeps snapping (covers the interpolation frame) */
 const SNAP_WINDOW = 0.15;
 
 /**
- * Planet camera. Intro: a slow, high orbit around the spawn that shows the planet's curve.
+ * Planet camera. Intro: a slow orbit around the spawn's up axis, far enough out to frame the whole
+ * globe (looking at the planet centre), then a swoop down into the follow cam.
  * Drive/card: third-person follow whose up is the local planet up at the car, damped, kept above the
- * terrain and lifted when a hill blocks the view, with a speed FOV and trauma-based shake
- * (`addTrauma` in ./shake). Shake is off with prefers-reduced-motion and halved in "low" quality.
+ * terrain and lifted when a hill blocks the view, with a speed FOV, an FOV punch (`addFovPunch`) and
+ * trauma-based shake (`addTrauma` in ./shake). Punch and shake are off with prefers-reduced-motion;
+ * shake is halved in "low" quality.
  *
  * Solid geometry: a spring arm runs from a pivot over the car's roof to the (damped, unobstructed)
  * follow position. Each frame one sphere sweep along it pulls the camera in fast when a wall, roof or
@@ -115,8 +128,8 @@ export function FollowCamera() {
 
     if (mode === "intro") {
       c.orbitAngle += (reduced ? CAMERA.orbitSpeedReduced : CAMERA.orbitSpeed) * dt;
-      orbitPosition(v.ground, v.up, c.orbitAngle, c.pos);
-      c.look.copy(v.position);
+      orbitPosition(v.up, c.orbitAngle, orbitDistance(CAMERA.fov, camera.aspect), c.pos);
+      c.look.set(0, 0, 0);
       c.final.copy(c.pos);
       c.armRatio = 1;
       c.blend = 0;
@@ -176,9 +189,11 @@ export function FollowCamera() {
     }
 
     const targetFov = mode === "intro" ? CAMERA.fov : followFov(v.forwardSpeed);
-    const fov = damp(c.fov, targetFov, 3, dt);
+    c.fov = damp(c.fov, targetFov, 3, dt);
+    // FOV punch (landings, crashes; see addFovPunch) rides on top of the damped speed FOV
+    const punch = reduced || mode === "intro" ? resetFovPunch() : stepFovPunch(dt);
+    const fov = c.fov + punch;
     if (Math.abs(fov - camera.fov) > 0.01) {
-      c.fov = fov;
       camera.fov = fov;
       camera.updateProjectionMatrix();
     }

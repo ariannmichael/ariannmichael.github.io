@@ -16,8 +16,6 @@ export interface ActiveZone {
 export interface AppState {
   mode: AppMode;
   quality: Quality;
-  /** PSX (PS1) visual style: low-res, vertex snapping, dithering. On by default; off = smooth rendering */
-  psx: boolean;
   muted: boolean;
   activeZone: ActiveZone | null;
   /** Content id of the open info card */
@@ -30,7 +28,6 @@ export interface AppState {
 
   setMode: (mode: AppMode) => void;
   setQuality: (quality: Quality) => void;
-  setPsx: (psx: boolean) => void;
   toggleMuted: () => void;
   setActiveZone: (zone: ActiveZone | null) => void;
   openCard: (id: string) => void;
@@ -43,8 +40,9 @@ export interface AppState {
 export const useAppStore = create<AppState>()((set) => ({
   mode: "intro",
   quality: "high",
-  psx: true,
-  muted: true,
+  // Sound on by default; audio still only starts after the first user gesture (world/audio), and the
+  // visitor's choice is restored from localStorage there (keep in sync with audio/mutePref MUTED_DEFAULT)
+  muted: false,
   activeZone: null,
   openCardId: null,
   gpsOpen: false,
@@ -54,7 +52,6 @@ export const useAppStore = create<AppState>()((set) => ({
 
   setMode: (mode) => set({ mode }),
   setQuality: (quality) => set({ quality }),
-  setPsx: (psx) => set({ psx }),
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
   setActiveZone: (activeZone) => set({ activeZone }),
   openCard: (id) => set({ openCardId: id, mode: "card" }),

@@ -2,8 +2,7 @@
 
 // The planet surface: one faceted vertex-coloured mesh + one fixed Rapier trimesh with the exact
 // same triangles (so `terrainHeight`, the visuals and the physics all agree).
-// The material is a plain MeshLambertMaterial (cheap, Gouraud-like = PS1) so the PSX pass can
-// patch it like every other material. Flat shading comes from the per-face normals baked into the
+// The material is a plain MeshLambertMaterial (cheap, Gouraud-like). Flat shading comes from the per-face normals baked into the
 // non-indexed geometry, not from `flatShading`.
 
 import { RigidBody, TrimeshCollider, useRapier } from "@react-three/rapier";

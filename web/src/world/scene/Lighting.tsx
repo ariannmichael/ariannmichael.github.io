@@ -31,8 +31,8 @@ const LIGHT_Y = new Vector3().crossVectors(SUN_DIR, LIGHT_X).normalize();
 
 export interface LightingProps {
   /**
-   * Real shadow maps. Default: on for quality "high" in smooth mode. Always off in PSX mode
-   * (a blob shadow under the car is used instead, like PS1 games did).
+   * Real shadow maps. Default: on for quality "high"; off on "low", where a blob shadow under the car
+   * stands in.
    */
   shadows?: boolean;
   /** Blob shadow under the car whenever real shadows are off. Default true. */
@@ -45,9 +45,8 @@ export interface LightingProps {
  * The directional light and its small shadow frustum follow the car (target = car, light = car + sun × d).
  */
 export function Lighting({ shadows, blobShadow = true }: LightingProps) {
-  const psx = useAppStore((s) => s.psx);
   const quality = useAppStore((s) => s.quality);
-  const castShadow = (shadows ?? quality === "high") && !psx;
+  const castShadow = shadows ?? quality === "high";
 
   const light = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
@@ -72,7 +71,7 @@ export function Lighting({ shadows, blobShadow = true }: LightingProps) {
     target.updateMatrixWorld();
     l.position.copy(target.position).addScaledVector(SUN_DIR, SUN_DISTANCE);
 
-    // Sun fades out past the terminator (no shadows in PSX, so it would otherwise light walls through the planet)
+    // Sun fades out past the terminator (without shadows it would otherwise light walls through the planet)
     const elevation = SUN_DIR.dot(basis.up);
     l.intensity = 1.9 * smoothstep(-0.12, 0.08, elevation);
     l.color.copy(LOW_SUN).lerp(DAY_SUN, smoothstep(0.0, 0.45, elevation));

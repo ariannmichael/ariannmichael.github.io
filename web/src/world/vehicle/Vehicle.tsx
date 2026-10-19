@@ -17,14 +17,16 @@ import type { DistrictId } from "@/content/types";
 import { addTrauma } from "@/world/camera/shake";
 import type { Control } from "@/world/controls";
 import { lookupKit, lookupModel, warnOnce } from "@/world/lib/models";
+import { emitGameEvent } from "@/world/events/gameEvents";
 import { PLANET_GRAVITY } from "@/world/planet/config";
+import { groundUpXYZ } from "@/world/planet/up";
 import { surfaceRadius } from "@/world/planet/frame";
 import { ModelErrorBoundary } from "@/world/town/ModelErrorBoundary";
 import { useAppStore } from "@/state/useAppStore";
 import { useInputStore } from "@/state/useInputStore";
 import { DEFAULT_CAR_SCALE, VEHICLE, VEHICLE_REF } from "./constants";
 import { VehicleDriver } from "./controller";
-import { combineAxis, contactTrauma, type DriveInput } from "./drive";
+import { combineAxis, contactTrauma, landingTrauma, type DriveInput } from "./drive";
 import { chassisInertia, configureVehicleController, wheelLayout } from "./setup";
 import { exposeDebugTeleport, onTeleportRequest, spawnPointAt, vehicleSpawnPose, yawOfHeading, type SpawnPoint } from "./spawn";
 import { BoxCar, VehicleModel, emptyVehicleNodes, type VehicleNodes } from "./VehicleModel";
@@ -50,6 +52,12 @@ export interface VehicleProps {
    * undefined to ignore. Usually `(d) => PLANET_LAYOUTS.find((l) => l.biome === d)?.spawn`.
    */
   spawnFor: (district: DistrictId) => SpawnPoint | undefined;
+}
+
+/** World position of the chassis (a fresh vector: event payloads keep it). */
+function carPosition(rb: { translation(): { x: number; y: number; z: number } }): Vector3 {
+  const t = rb.translation();
+  return new Vector3(t.x, t.y, t.z);
 }
 
 /**
@@ -142,10 +150,12 @@ export function Vehicle({ spawn, spawnFor }: VehicleProps) {
     const resetHere = () => {
       if (useAppStore.getState().mode === "card") return;
       teleport(spawnPointAt(vehicleState.position, vehicleState.heading));
+      emitGameEvent({ type: "reset", position: vehicleState.position.clone() });
     };
     const goTo = (target: SpawnPoint) => {
       lastSpawn.current = target;
       teleport(target);
+      emitGameEvent({ type: "teleport", position: vehicleSpawnPose(target).position.clone() });
     };
     const unsubKeys = subscribeKeys(
       (s) => s.reset,
@@ -200,7 +210,22 @@ export function Vehicle({ spawn, spawnFor }: VehicleProps) {
     if (ev.landingSpeed > 0) {
       vehicleState.landingCount += 1;
       vehicleState.landingSpeed = ev.landingSpeed;
+      emitGameEvent({
+        type: "landing",
+        impact: ev.landingSpeed,
+        airTime: ev.landingAirTime,
+        strength: landingTrauma(ev.landingSpeed) / 0.8,
+        position: carPosition(rb),
+      });
     }
+    if (ev.takeoff) emitGameEvent({ type: "takeoff", speed: driver.speed, position: carPosition(rb) });
+    if (ev.crashSpeedLost > 0) {
+      emitGameEvent({ type: "crash", strength: ev.crashStrength, speedLost: ev.crashSpeedLost, position: carPosition(rb) });
+    }
+    // Driver inputs as telemetry (engine sound, brake lights, HUD)
+    vehicleState.throttle = input.throttle;
+    vehicleState.steer = input.steer;
+    vehicleState.handbrake = input.handbrake;
 
     // Tunnelled through the ground (or fell out of the world): back to the last spawn
     const t = rb.translation();
@@ -212,7 +237,17 @@ export function Vehicle({ spawn, spawnFor }: VehicleProps) {
   });
 
   const onContactForce = useCallback((p: ContactForcePayload) => {
-    addTrauma(contactTrauma(p.totalForceMagnitude));
+    const trauma = contactTrauma(p.totalForceMagnitude);
+    addTrauma(trauma);
+    const rb = body.current;
+    if (trauma > 0 && rb) {
+      emitGameEvent({
+        type: "bump",
+        strength: trauma / 0.7,
+        dynamic: p.other.rigidBody?.isDynamic() ?? false,
+        position: carPosition(rb),
+      });
+    }
   }, []);
 
   // Visual sync + telemetry: every rendered frame, after the physics step (Physics runs at a
@@ -226,7 +261,7 @@ export function Vehicle({ spawn, spawnFor }: VehicleProps) {
 
     s.position.copy(obj.position);
     s.quaternion.copy(obj.quaternion);
-    s.up.copy(obj.position).normalize();
+    groundUpXYZ(obj.position.x, obj.position.y, obj.position.z, s.up);
     s.chassisUp.set(0, 1, 0).applyQuaternion(obj.quaternion);
     s.forward.set(0, 0, 1).applyQuaternion(obj.quaternion);
     // Heading: nose projected onto the tangent plane; keep the last one if pointing straight up/down

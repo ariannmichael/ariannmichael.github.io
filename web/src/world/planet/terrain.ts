@@ -80,7 +80,7 @@ const weightScratch = new Float32Array(BIOME_COUNT);
 
 /** Noise height without road beds or pads. */
 function baseHeightXYZ(x: number, y: number, z: number): number {
-  // Planet-scale swell (~150 m features) so the horizon rolls.
+  // Planet-scale swell (planet-sized features) so the horizon rolls.
   let h = 4 * fbm(globalNoise, x * 1.1, y * 1.1, z * 1.1, 3, 2, 0.45);
   const w = biomeWeightsXYZ(x, y, z, weightScratch);
   for (let i = 0; i < BIOME_COUNT; i++) {
@@ -105,25 +105,37 @@ export interface PreparedPad {
   target: number;
   /** cos of the outer angular radius, for a cheap reject */
   cosOuter: number;
+  /** Flatten to the tangent plane at the centre rather than a shell at `target` */
+  planar: boolean;
+  /** Planar only: cos of the core's angular radius (the ring holds the plane's height at this rim) */
+  cosRim: number;
 }
 
-/** Resolves pads once: direction + flatten height (natural height at the centre + `height`). */
+/** Resolves pads once: direction + flatten height (natural height, or the ground left by the pads before it for `onGround`, at the centre + `height`). */
 export function preparePads(pads: readonly FlatPad[]): PreparedPad[] {
-  return pads.map((p) => {
-    const la = p.lat * DEG;
-    const lo = p.lon * DEG;
-    const x = Math.cos(la) * Math.sin(lo);
-    const y = Math.sin(la);
-    const z = Math.cos(la) * Math.cos(lo);
-    const blend = p.blend ?? 8;
-    return {
-      x, y, z,
-      radius: p.radius,
-      blend,
-      target: naturalHeightXYZ(x, y, z) + (p.height ?? 0),
-      cosOuter: Math.cos(Math.min(Math.PI, (p.radius + blend) / R)),
-    };
-  });
+  const out: PreparedPad[] = [];
+  for (const p of pads) out.push(preparePad(p, out));
+  return out;
+}
+
+function preparePad(p: FlatPad, before: readonly PreparedPad[]): PreparedPad {
+  const la = p.lat * DEG;
+  const lo = p.lon * DEG;
+  const x = Math.cos(la) * Math.sin(lo);
+  const y = Math.sin(la);
+  const z = Math.cos(la) * Math.cos(lo);
+  const blend = p.blend ?? 8;
+  const natural = naturalHeightXYZ(x, y, z);
+  const target = (p.onGround ? applyPads(x, y, z, natural, before) : natural) + (p.height ?? 0);
+  return {
+    x, y, z,
+    radius: p.radius,
+    blend,
+    target,
+    cosOuter: Math.cos(Math.min(Math.PI, (p.radius + blend) / R)),
+    planar: !!p.planar,
+    cosRim: Math.cos(Math.min(Math.PI / 3, p.radius / R)),
+  };
 }
 
 /** Applies pads (in order; later pads win where they overlap) to height `h` at a direction. */
@@ -134,7 +146,15 @@ export function applyPads(x: number, y: number, z: number, h: number, pads: read
     if (c < p.cosOuter) continue;
     const dist = Math.acos(c > 1 ? 1 : c) * R;
     const t = smoothstep(p.radius, p.radius + p.blend, dist);
-    h = p.target + (h - p.target) * t;
+    let target = p.target;
+    if (p.planar) {
+      // The tangent plane at radius R + target, seen along this direction: it rises off the sphere by
+      // ≈ d²/2R, which keeps a wide floor flat under a straight building. Past the rim the plane would
+      // keep rising and grow a raised lip around the pad (a launch ramp at every door), so the ring
+      // holds the plane's height at the rim and blends from there down to natural ground.
+      target = (R + p.target) / Math.max(c, p.cosRim) - R;
+    }
+    h = target + (h - target) * t;
   }
   return h;
 }

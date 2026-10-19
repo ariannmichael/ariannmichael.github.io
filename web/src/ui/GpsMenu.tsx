@@ -1,12 +1,17 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import { districts } from "@/content";
+import type { DistrictId } from "@/content/types";
 import { useAppStore } from "@/state/useAppStore";
 import { BIOMES } from "@/world/planet/biomes";
 import Modal, { CloseButton } from "./Modal";
 import TrackedLink from "./TrackedLink";
+import { usePrefersReducedMotion } from "./lib/hooks";
 import styles from "./GpsMenu.module.css";
+
+/** The picked destination blinks this long before the jump (matches `.item[data-picked]` in the CSS) */
+const PICK_FLASH_MS = 330;
 
 /** Teleport menu. Opened by the HUD button or the M key (handled in the world). */
 export default function GpsMenu() {
@@ -20,7 +25,23 @@ function GpsDialog() {
   const setGpsOpen = useAppStore((s) => s.setGpsOpen);
   const teleportTo = useAppStore((s) => s.teleportTo);
   const visited = useAppStore((s) => s.visitedDistricts);
+  const reducedMotion = usePrefersReducedMotion();
+  // Destination being confirmed: it flashes, then we jump (straight away with reduced motion).
+  const [picked, setPicked] = useState<DistrictId | null>(null);
   const close = () => setGpsOpen(false);
+
+  useEffect(() => {
+    if (!picked) return;
+    const t = window.setTimeout(() => teleportTo(picked), PICK_FLASH_MS);
+    // Closing (Esc, backdrop) during the flash cancels the jump.
+    return () => window.clearTimeout(t);
+  }, [picked, teleportTo]);
+
+  function pick(id: DistrictId) {
+    if (picked) return; // ignore double clicks while the first one flashes
+    if (reducedMotion) teleportTo(id);
+    else setPicked(id);
+  }
 
   // Every career district is a biome on the planet now: all reachable, in content order.
   const themes = new Map(BIOMES.map((b) => [b.district, b.theme]));
@@ -36,15 +57,17 @@ function GpsDialog() {
           </h2>
         </header>
         <ul className={styles.list}>
-          {districts.map((d) => {
+          {districts.map((d, i) => {
             const wasVisited = visited.includes(d.id);
             const theme = themes.get(d.id);
             return (
-              <li key={d.id}>
+              // --i staggers the entrance (CSS), so the list deals itself in after the panel pops
+              <li key={d.id} className={styles.entry} style={{ "--i": i } as CSSProperties}>
                 <button
                   type="button"
                   className={styles.item}
-                  onClick={() => teleportTo(d.id)}
+                  data-picked={picked === d.id || undefined}
+                  onClick={() => pick(d.id)}
                   aria-describedby={`${headingId}-${d.id}`}
                 >
                   <span className={styles.pin} aria-hidden="true">

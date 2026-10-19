@@ -6,10 +6,10 @@
 // surface height exactly, not an approximation.
 
 /**
- * Edge subdivisions per icosahedron face. Triangles = 20·N² → 44 gives 38,720 triangles with
- * ~3.8 m edges at R = 150 (one mesh for both render and the Rapier trimesh; see terrainMesh.ts).
+ * Edge subdivisions per icosahedron face. Triangles = 20·N² → 27 gives 14,580 triangles with
+ * ~3.7 m edges at R = 90 (one mesh for both render and the Rapier trimesh; see terrainMesh.ts).
  */
-export const SUBDIVISIONS = 44;
+export const SUBDIVISIONS = 27;
 
 const T = (1 + Math.sqrt(5)) / 2;
 // Same corner/face table as three's IcosahedronGeometry (faces wound CCW seen from outside).

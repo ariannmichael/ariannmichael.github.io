@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { links, profile } from "@/content";
@@ -17,6 +17,15 @@ const geistMono = Geist_Mono({
 const title = "Ariann Michael · Senior Software Engineer & Game Developer";
 const description =
   "Drive through Ariann Michael's portfolio: 7+ years building healthcare and B2B web platforms, plus Speed King on Steam and games on itch.io.";
+
+// Browser chrome tint on phones (sky blue by day, the night-sky navy in dark mode). The game routes
+// add viewport-fit=cover and the zoom lock themselves, so Plain view stays pinch-zoomable.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#bfe3ff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b2440" },
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ariannmichael.github.io"),

@@ -16,9 +16,10 @@ export const BIOME_COUNT = BIOMES.length;
 /**
  * Edge-distance difference (degrees) over which a biome fades out against the nearest one.
  * Moving across a border changes the difference ~2° per degree, so the visible blend band is
- * about BORDER_DEG / 2 ≈ 11° (≈ 29 m at R = 150) wide.
+ * about BORDER_DEG / 2 ≈ 20° (≈ 31 m at R = 90) wide: it fills the corridor between towns (centres
+ * 74.9° apart, towns ≤ 25° across), so base heights change gently out on the open road.
  */
-export const BORDER_DEG = 22;
+export const BORDER_DEG = 40;
 /** Border wobble amplitude (degrees) */
 const WOBBLE_DEG = 6;
 

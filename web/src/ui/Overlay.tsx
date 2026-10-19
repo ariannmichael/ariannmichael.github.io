@@ -7,8 +7,10 @@ import type { DistrictId } from "@/content/types";
 import { useAppStore } from "@/state/useAppStore";
 import WorldLoader from "@/world/WorldLoader";
 import { onIdle } from "@/world/lib/idle";
+import { initialQuality, readDisplay } from "@/world/lib/mobileQuality";
 import GpsMenu from "./GpsMenu";
 import InfoCard from "./InfoCard";
+import JuiceHud from "./JuiceHud";
 import TouchControls from "./TouchControls";
 import TrackedLink from "./TrackedLink";
 import { cardTitle, resolveCard } from "./cards/resolveCard";
@@ -26,10 +28,17 @@ export default function Overlay({ district }: { district: DistrictId }) {
   // The probe can pass while the real context still fails (GPU blocklist, too many contexts, driver
   // reset): R3F rethrows that from <Canvas>, and we fall back exactly as if WebGL2 were missing.
   const [crashed, setCrashed] = useState(false);
+  const contextLost = useContextLost();
   const webgl = crashed ? false : detected;
   // Creating the WebGL context is a long main-thread task; start it only after the server-rendered
   // overlay (name, CV, controls hint) has been painted, so it never delays first/LCP paint.
   const painted = useAfterPresentedPaint();
+
+  // Phones and small screens start on the cheap tier (the visitor can flip it back to HQ with the
+  // HUD button). Runs long before the canvas mounts, so the world never builds the HQ pipeline first.
+  useEffect(() => {
+    useAppStore.getState().setQuality(initialQuality(readDisplay()));
+  }, []);
 
   return (
     <>
@@ -41,6 +50,7 @@ export default function Overlay({ district }: { district: DistrictId }) {
         </div>
       )}
       {webgl === false && <NoWebGL />}
+      {contextLost && webgl !== false && <ContextLost />}
       {/* Server-rendered (webgl is null until hydration): the controls hint is real text the browser
           paints with the first frame instead of after the WebGL probe and 3D bundle kick in. */}
       {webgl !== false && <BottomStack />}
@@ -48,8 +58,10 @@ export default function Overlay({ district }: { district: DistrictId }) {
         <>
           <Loader />
           <InteractionPrompt />
+          <TapToDrive />
           <TouchControls />
           <GpsMenu />
+          <JuiceHud />
         </>
       )}
       {/* Cards are plain HTML, so deep links still work without WebGL. */}
@@ -74,6 +86,54 @@ class WorldBoundary extends Component<{ onError: () => void; children: ReactNode
   render() {
     return this.state.failed ? null : this.props.children;
   }
+}
+
+/**
+ * True while the GPU has taken the WebGL context away (phones do this under memory pressure or when
+ * the tab sat in the background). webglcontextlost doesn't bubble, so listen in the capture phase.
+ * preventDefault() lets the browser restore the context, which clears the flag again.
+ */
+function useContextLost(): boolean {
+  const [lost, setLost] = useState(false);
+  useEffect(() => {
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      setLost(true);
+    };
+    const onRestored = () => setLost(false);
+    document.addEventListener("webglcontextlost", onLost, true);
+    document.addEventListener("webglcontextrestored", onRestored, true);
+    return () => {
+      document.removeEventListener("webglcontextlost", onLost, true);
+      document.removeEventListener("webglcontextrestored", onRestored, true);
+    };
+  }, []);
+  return lost;
+}
+
+function ContextLost() {
+  return (
+    <section className={styles.fallback} role="alert" aria-labelledby="ctx-lost-title">
+      <p className={styles.fallbackIcon} aria-hidden="true">
+        🚗💤
+      </p>
+      <h2 id="ctx-lost-title" className={styles.fallbackTitle}>
+        The 3D view paused
+      </h2>
+      <p className={styles.fallbackText}>
+        Your device took back its graphics memory. It usually comes back by itself; if not, reload, or
+        use the simple page.
+      </p>
+      <div className={styles.fallbackActions}>
+        <TrackedLink className={styles.bigLink} href="/plain/" event="plain_view">
+          Open the Plain view
+        </TrackedLink>
+        <button type="button" className={styles.secondaryLink} onClick={() => window.location.reload()}>
+          Reload
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function NoWebGL() {
@@ -158,6 +218,30 @@ function BottomStack() {
 
 function Key({ children, wide }: { children: string; wide?: boolean }) {
   return <kbd className={wide ? `${styles.key} ${styles.keyWide}` : styles.key}>{children}</kbd>;
+}
+
+/**
+ * Touch only: the way out of the intro orbit. Keyboard players press W; a phone has no such key, so
+ * a big pulsing button says so. Touching the stick or brake leaves the intro too (TouchControls).
+ */
+function TapToDrive() {
+  const coarse = useIsCoarsePointer();
+  const intro = useAppStore((s) => s.mode === "intro");
+  const setMode = useAppStore((s) => s.setMode);
+  if (!coarse) return null;
+  return (
+    <button
+      type="button"
+      className={styles.tapToDrive}
+      data-hidden={!intro}
+      aria-hidden={!intro}
+      tabIndex={intro ? 0 : -1}
+      onClick={() => setMode("drive")}
+    >
+      <span className={styles.tapToDriveTitle}>Tap to drive</span>
+      <span className={styles.tapToDriveSub}>then drag the stick to steer</span>
+    </button>
+  );
 }
 
 /** "Press E to open · <title>" while parked at a marker. Clicking/tapping it opens the card too. */

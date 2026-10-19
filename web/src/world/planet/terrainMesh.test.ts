@@ -5,6 +5,7 @@ import { BIOME_COUNT, biomeWeights } from "./biomeField";
 import { mulberry32 } from "./noise";
 import { analyticHeightXYZ, preparePads, terrainHeight } from "./terrain";
 import { SUBDIVISIONS } from "./terrainGrid";
+import { PLANET_RADIUS } from "@/world/planet/config";
 import {
   buildPlanetColliderData,
   buildPlanetGeometry,
@@ -14,7 +15,7 @@ import {
   vertexCount,
 } from "./terrainMesh";
 
-const R = 150;
+const R = PLANET_RADIUS;
 
 describe("planet mesh", () => {
   const t0 = performance.now();

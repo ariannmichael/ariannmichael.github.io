@@ -14,7 +14,6 @@ import {
   MeshStandardMaterial,
   TextureLoader,
   Vector3,
-  WebGLRenderTarget,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
@@ -23,13 +22,12 @@ import {
   type SkinnedMesh,
 } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { useAppStore } from "@/state/useAppStore";
 import type { KitInfo, ModelInfo } from "@/world/models/types";
 import { isGroundRef, localColliderBox, resolveCollider } from "@/world/lib/placement";
 import { placementPose, planetPlacementMatrix } from "@/world/lib/planetPlacement";
 import { lookupKit, lookupModel, warnOnce } from "@/world/lib/models";
 import type { ModelGroup, PlacedItem } from "./group";
-import { flatMaterial, paletteMaterial } from "./materials";
+import { cvBillboardMaterial, flatMaterial, paletteMaterial } from "./materials";
 import { extractPrimitives, type Primitive } from "./primitives";
 
 /**
@@ -75,7 +73,14 @@ function TexturedModel({ group, info, kit, texture, onReady }: ModelProps & { te
 
 function FlatModel({ group, info, kit, onReady }: ModelProps) {
   const gltf = useGLTF(info.url, false);
-  const resolve = useMemo<ResolveMaterial>(() => (material) => flatMaterial(info.kit, material), [info.kit]);
+  const resolve = useMemo<ResolveMaterial>(() => {
+    // The home billboard's Tankco ad becomes the CV banner; the raceway's billboards are different
+    // models, so they keep their own ads
+    if (group.ref === "racing-kit/billboard") {
+      return (material) => (material.name === "tankco" ? cvBillboardMaterial() : flatMaterial(info.kit, material));
+    }
+    return (material: Material) => flatMaterial(info.kit, material);
+  }, [info.kit, group.ref]);
   return (
     <ModelBody group={group} info={info} kitScale={kit?.scale ?? 1} gltf={gltf} resolve={resolve} onReady={onReady} />
   );
@@ -167,10 +172,9 @@ function useWarmShaders(root: { current: Object3D | null }, onWarm: () => void):
     const { gl, camera, scene } = get();
     // compile() gathers materials with traverse() (invisible objects included) and lights from `scene`.
     // Programs also depend on whether a render target is bound (output colour space, tone mapping):
-    // with PSX on the scene pass draws into PSX's low-res target, so compile against a target too, or
-    // we'd warm a variant the real frame never uses.
+    // the real frame draws straight to the canvas, so compile with no target bound.
     const prevTarget = gl.getRenderTarget();
-    gl.setRenderTarget(useAppStore.getState().psx ? compileTarget() : null);
+    gl.setRenderTarget(null);
     let compiling: Promise<unknown>;
     try {
       compiling = gl.compileAsync(obj, camera, scene);
@@ -286,12 +290,6 @@ function hasSkinnedMesh(root: Object3D): boolean {
     if ((o as SkinnedMesh).isSkinnedMesh) found = true;
   });
   return found;
-}
-
-let sharedCompileTarget: WebGLRenderTarget | undefined;
-/** Any non-XR target gives the same program variant as PSX's scene target; 1x1 is enough. */
-function compileTarget(): WebGLRenderTarget {
-  return (sharedCompileTarget ??= new WebGLRenderTarget(1, 1));
 }
 
 /** Default animation for skinned characters (Kenney mini-characters ship "idle"); placement.anim overrides. */

@@ -15,9 +15,10 @@ import {
 } from "./terrain";
 import { getRoads, roadBedXYZ } from "./roads";
 import { groundColorAt } from "./terrainColor";
+import { PLANET_RADIUS } from "@/world/planet/config";
 
 const DEG = Math.PI / 180;
-const R = 150;
+const R = PLANET_RADIUS;
 
 function randomDir(rnd: () => number, out = new Vector3()) {
   const z = rnd() * 2 - 1;
@@ -66,8 +67,8 @@ describe("terrainHeight", () => {
       randomDir(rnd, v);
       const f = surfaceFrame(v);
       step(v, rnd() < 0.5 ? f.east : f.north, 0.02, u);
-      // Steepest faces are ~60°: tan(60°)·2 cm ≈ 3.5 cm.
-      expect(Math.abs(terrainHeight(u) - terrainHeight(v))).toBeLessThan(0.06);
+      // Steepest faces (terrace risers, pad rims on the 90 m planet's finer mesh) are ~70°: tan(70°)·2 cm ≈ 5.5 cm.
+      expect(Math.abs(terrainHeight(u) - terrainHeight(v))).toBeLessThan(0.08);
     }
   });
 
@@ -155,7 +156,7 @@ describe("flat pads", () => {
     for (let m = 0; m <= 40; m += 0.5) {
       step(dir, tangent, m, p);
       const natural = naturalHeightXYZ(p.x, p.y, p.z);
-      const h = analyticHeightXYZ(p.x, p.y, p.z, pads);
+      const h = analyticHeightXYZ(p.x, p.y, p.z, pads, []);
       if (m <= 14) expect(h).toBeCloseTo(target, 9);
       else if (m >= 22.01) expect(h).toBeCloseTo(natural, 9);
       else {

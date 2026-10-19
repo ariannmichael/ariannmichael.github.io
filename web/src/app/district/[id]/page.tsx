@@ -41,6 +41,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export const viewport: Viewport = {
   viewportFit: "cover",
+  // Steering with two thumbs must never turn into a pinch-zoom of the page (iOS Safari ignores this
+  // flag and relies on touch-action: none on the controls, see globals.css / AppShell.module.css)
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default async function DistrictPage({ params }: Props) {

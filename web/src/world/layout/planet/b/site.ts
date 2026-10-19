@@ -9,7 +9,7 @@
 // straight and square.
 //
 // Pure maths only, via planet/sphere.ts (no terrain import), so it is safe at module top level.
-import { headingAt, latLonToDir, offsetLatLon, surfaceFrame } from "@/world/planet/sphere";
+import { degToMetres, headingAt, latLonToDir, offsetLatLon, surfaceFrame } from "@/world/planet/sphere";
 import type { FlatPad, LatLon, PlanetMarker, PlanetPlacement } from "@/world/planet/types";
 
 const DEG = Math.PI / 180;
@@ -26,6 +26,8 @@ export interface SubFrame {
   place(fwd: number, right: number, rest: PlacementRest): PlanetPlacement;
   /** Heading of the sub-frame in the anchor frame, degrees */
   yaw: number;
+  /** Tangent-plane anchor (the sub-frame origin) when the frame is planar; every `place` stands on it */
+  plane?: LatLon;
 }
 
 export function site(anchor: LatLon) {
@@ -59,26 +61,49 @@ export function site(anchor: LatLon) {
     ...rest,
   });
 
+  /** Inverse of `at`: anchor-frame (north, east) metres of a lat/lon. */
+  const toNE = (p: LatLon): [number, number] => {
+    const d = latLonToDir(p.lat, p.lon);
+    const up = anchorFrame.up;
+    const t = d.clone().addScaledVector(up, -d.dot(up));
+    const len = t.length();
+    if (len < 1e-12) return [0, 0];
+    const k = degToMetres(Math.acos(Math.min(1, d.dot(up))) * (180 / Math.PI)) / len;
+    return [t.dot(anchorFrame.north) * k, t.dot(anchorFrame.east) * k];
+  };
+
   const spawn = (north: number, east: number, yaw: number) => {
     const p = at(north, east);
     return { ...p, yaw: localYaw(p, yaw) };
   };
 
-  /** Rotated sub-frame whose origin is at (north, east) and whose heading is `yaw` (anchor frame). */
-  const frame = (north: number, east: number, yaw: number): SubFrame => {
+  /**
+   * Rotated sub-frame whose origin is at (north, east) and whose heading is `yaw` (anchor frame).
+   * `planar`: every piece placed through it stands on the tangent plane at the origin (pair it with a
+   * `planar` pad centred on the origin), so modular walls and floors stay square on the small planet.
+   * `planeAt`: the plane's anchor in sub-frame (fwd, right) metres, when the pad is not centred on the origin.
+   */
+  const frame = (
+    north: number,
+    east: number,
+    yaw: number,
+    opts: { planar?: boolean; planeAt?: [number, number] } = {},
+  ): SubFrame => {
     const c = Math.cos(yaw * DEG);
     const s = Math.sin(yaw * DEG);
     // Heading yaw → (n, e) = (cos, -sin); its right-hand side (yaw - 90) → (sin, cos)
     const ne = (fwd: number, right: number): [number, number] => [north + fwd * c + right * s, east - fwd * s + right * c];
+    const plane = opts.planeAt ? at(...ne(...opts.planeAt)) : opts.planar ? at(north, east) : undefined;
     return {
       yaw,
       ne,
+      plane,
       place: (fwd, right, rest) => {
         const [n, e] = ne(fwd, right);
-        return place(n, e, { ...rest, yaw: yaw + (rest.yaw ?? 0) });
+        return place(n, e, { ...(plane ? { plane } : {}), ...rest, yaw: yaw + (rest.yaw ?? 0) });
       },
     };
   };
 
-  return { at, place, marker, pad, spawn, frame };
+  return { at, toNE, place, marker, pad, spawn, frame };
 }

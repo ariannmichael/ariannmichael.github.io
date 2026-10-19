@@ -4,15 +4,18 @@ import { Billboard, Text } from "@react-three/drei";
 import { CuboidCollider, RigidBody, type IntersectionEnterPayload } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { Vector3, type Group } from "three";
+import { Vector3, type Group, type Mesh } from "three";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { DistrictId } from "@/content/types";
 import { districtOfBiome } from "@/world/lib/biomeMap";
 import { markerPose, markerSensorBox } from "@/world/lib/planetPlacement";
 import type { BiomeLayout, PlanetMarker } from "@/world/planet/types";
 import { useAppStore } from "@/state/useAppStore";
-import { LABEL_LAYER } from "@/world/psx/config";
+import { PLANET_RADIUS } from "@/world/planet/config";
+import { MARKER_FX, labelPop, markerProximity } from "@/world/fx/juiceRules";
 import { vehicleState } from "@/world/vehicle/vehicleState";
 import { ZONE_HEIGHT, ZONE_SIZE, markerLabel } from "./markers";
+import { bindMarkerUniforms, markerFxAssets, setMarkerDraw, setMarkerTime, type MarkerDrawState } from "./markerFx";
 
 /** Optional local font for labels. Without one, troika loads its default font from a CDN. */
 // Kenney Mini Square Mono (CC0, kenney.nl), served locally: the only Kenney font whose "K" does not read as "H"
@@ -25,9 +28,13 @@ const LABEL_HEIGHT = 5.2;
 const LABEL_FULL_SIZE_DISTANCE = 28;
 const LABEL_MIN_SCALE = 0.3;
 const LABEL_HIDE_NEAR = 7;
-const LABEL_HIDE_FAR = 160;
-// Past this distance labels grow again (up to LABEL_FAR_SCALE at LABEL_HIDE_FAR) so the intro orbit stays readable.
-const LABEL_GROW_FROM = 60;
+// Past one planet radius a marker is over the horizon while driving, and in the intro's globe view
+// (≥ ~140 m from every marker) dozens of labels would only clutter the globe: they appear as the
+// camera swoops down.
+export const LABEL_HIDE_FAR = PLANET_RADIUS;
+// Past this distance labels grow again (up to LABEL_FAR_SCALE at LABEL_HIDE_FAR) so stops across
+// town stay readable over the curve.
+export const LABEL_GROW_FROM = 0.4 * PLANET_RADIUS;
 const LABEL_FAR_SCALE = 1.8;
 
 export function labelScale(distance: number): number {
@@ -84,48 +91,95 @@ function Zone({ marker, district }: { marker: PlanetMarker; district: DistrictId
         onIntersectionEnter={onEnter}
         onIntersectionExit={onExit}
       />
-      <ZoneMarker marker={marker} label={label} />
+      <ZoneMarker marker={marker} label={label} district={district} />
     </>
   );
 }
 
-/** Floating label plus a flat ring on the ground showing where to park, in the marker's local frame. */
-function ZoneMarker({ marker, label }: { marker: PlanetMarker; label: string }) {
+/**
+ * Floating label plus a GTA San Andreas-style marker showing where to park, in the marker's local
+ * frame: a red tube of light fading upwards, a glowing ring and disc on the ground and a soft halo
+ * (zones/markerFx; shared geometry and materials). Juice: the marker breathes gently, brightens and
+ * pulses harder as the car approaches and brighter still while it is the active zone, and the label
+ * pops when this zone becomes active (reduced motion: brightness only, no pulse or pop).
+ */
+function ZoneMarker({ marker, label, district }: { marker: PlanetMarker; label: string; district: DistrictId }) {
   const labelRef = useRef<Group>(null);
+  const discRef = useRef<Mesh>(null);
+  const fx = markerFxAssets();
+  /** One state object shared by this marker's three meshes (read in bindMarkerUniforms) */
+  const draw = useMemo<MarkerDrawState>(() => ({ intensity: MARKER_FX.baseIntensity, pulse: 0 }), []);
+  const fxData = useMemo(() => ({ marker: draw }), [draw]);
+  const reduced = usePrefersReducedMotion();
+  /** Seconds (clock) when this zone last became active; -Infinity when it isn't */
+  const activeSince = useRef(-Infinity);
   const pose = useMemo(() => markerPose(marker), [marker]);
   const labelPos = useMemo(
     () => pose.position.clone().addScaledVector(new Vector3(0, 1, 0).applyQuaternion(pose.quaternion), LABEL_HEIGHT),
     [pose],
   );
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
+    const now = clock.elapsedTime;
+    const zone = useAppStore.getState().activeZone;
+    const active = zone?.id === marker.id && zone.district === district;
+    if (active && activeSince.current === -Infinity) activeSince.current = now;
+    else if (!active) activeSince.current = -Infinity;
+
+    // Reduced motion freezes the shared clock: no drifting bands, no breathing
+    if (!reduced) setMarkerTime(now);
+    const p = active ? 1 : markerProximity(vehicleState.position.distanceTo(pose.position));
+    setMarkerDraw(
+      draw,
+      active ? MARKER_FX.activeIntensity : MARKER_FX.baseIntensity + (MARKER_FX.litIntensity - MARKER_FX.baseIntensity) * p,
+      reduced ? 0 : MARKER_FX.idlePulse + (MARKER_FX.litPulse - MARKER_FX.idlePulse) * p,
+    );
+    const disc = discRef.current;
+    if (disc) {
+      const pulse = reduced ? 0 : MARKER_FX.pulseAmp * p * (0.5 + 0.5 * Math.sin(now * MARKER_FX.pulseSpeed));
+      disc.scale.setScalar(1 + pulse);
+    }
+
     const g = labelRef.current;
     if (!g) return;
     const s = labelScale(camera.position.distanceTo(labelPos));
     g.visible = s > 0;
-    if (s > 0) g.scale.setScalar(s);
+    if (s > 0) g.scale.setScalar(s * (reduced ? 1 : labelPop(now - activeSince.current)));
   });
 
   return (
     <group position={pose.position} quaternion={pose.quaternion}>
-      <mesh rotation-x={-Math.PI / 2} position-y={0.08} renderOrder={1}>
-        <ringGeometry args={[ZONE_SIZE * 0.36, ZONE_SIZE * 0.42, 48]} />
-        {/* No PSX vertex snapping: the thin ring hovers just over the ground and would flicker into it */}
-        <meshBasicMaterial
-          color="#ffd23f"
-          transparent
-          opacity={0.85}
-          depthWrite={false}
-          userData={{ psxSkip: true }}
-        />
-      </mesh>
+      {/* Transparent and depth-write free, drawn after the opaque world: ground disc, then tube, then halo */}
+      <mesh
+        ref={discRef}
+        geometry={fx.discGeometry}
+        material={fx.discMaterial}
+        rotation-x={-Math.PI / 2}
+        position-y={0.08}
+        renderOrder={1}
+        userData={fxData}
+        onBeforeRender={bindMarkerUniforms}
+      />
+      <mesh
+        geometry={fx.beamGeometry}
+        material={fx.beamMaterial}
+        position-y={0.05}
+        renderOrder={2}
+        userData={fxData}
+        onBeforeRender={bindMarkerUniforms}
+      />
+      <mesh
+        geometry={fx.haloGeometry}
+        material={fx.haloMaterial}
+        position-y={fx.haloY}
+        renderOrder={3}
+        userData={fxData}
+        onBeforeRender={bindMarkerUniforms}
+      />
       {/* Billboard copies the camera's world rotation (minus the parent's), so the text is upright
-          on screen whatever the local up is, as long as the follow camera's `up` is the local up.
-          The text sits on LABEL_LAYER only: in PSX mode the pipeline draws it after the low-res
-          pass at full resolution (depth-tested against the scene), so it stays readable. */}
+          on screen whatever the local up is, as long as the follow camera's `up` is the local up. */}
       <Billboard ref={labelRef} position-y={LABEL_HEIGHT}>
         <Text
-          layers={LABEL_LAYER}
           font={LABEL_FONT}
           fontSize={1.1}
           color="#1d1d2b"

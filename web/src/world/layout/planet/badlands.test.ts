@@ -2,10 +2,10 @@
 import { biomeAt } from "@/world/planet/terrain";
 import { describe, expect, it } from "vitest";
 import { hasModel } from "@/world/models";
-import { angleBetween, latLonToDir } from "@/world/planet/frame";
+import { angleBetween, degToMetres, latLonToDir } from "@/world/planet/frame";
 import { BIOMES } from "@/world/planet/biomes";
-import { budgetCounts, fixedBoxes, groundPoint, insideBox } from "./c/check";
-import { badlandsLayout as layout } from "./badlands";
+import { budgetCounts, fixedBoxes, groundPoint, insideBox, laneHits, unreachable } from "./c/check";
+import { BADLANDS_SPAWN, badlandsLayout as layout } from "./badlands";
 
 const biome = BIOMES.find((b) => b.id === "badlands")!;
 
@@ -40,5 +40,29 @@ describe("badlands layout", () => {
     expect(c.dynamic).toBeLessThanOrEqual(12);
     expect(layout.pads.some((p) => (p.height ?? 0) > 0)).toBe(true);
     expect(layout.pads.some((p) => (p.height ?? 0) < 0)).toBe(true);
+  });
+
+  it("spawns 5–25 m from the centre on the flat apron", () => {
+    const d = degToMetres(angleBetween(layout.spawn, biome.center));
+    expect(d).toBeGreaterThanOrEqual(5);
+    expect(d).toBeLessThanOrEqual(25);
+    const onFlat = layout.pads.some((p) => !p.height && degToMetres(angleBetween(p, layout.spawn)) <= p.radius);
+    expect(onFlat).toBe(true);
+  });
+
+  it("keeps two 12 m road lanes clear from the spawn toward 321° and 39°", () => {
+    expect(laneHits(layout, biome.center, BADLANDS_SPAWN, [321, 39])).toEqual([]);
+  });
+
+  it("can drive from the spawn to every feature", () => {
+    const features = [
+      { label: "tabletop", n: -24, e: 1 },
+      { label: "big hill", n: -4, e: -24 },
+      { label: "ridge", n: 4, e: -31 },
+      { label: "whoops", n: -3, e: 33 },
+      { label: "bowl", n: -21, e: 19 },
+      { label: "crater", n: -26, e: -18 },
+    ];
+    expect(unreachable(layout, biome.center, BADLANDS_SPAWN, features)).toEqual([]);
   });
 });

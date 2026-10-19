@@ -6,6 +6,7 @@ import type { DynamicRayCastVehicleController, RigidBody } from "@dimforge/rapie
 import { Quaternion, Vector3 } from "three";
 import { clamp } from "@/world/lib/damping";
 import { PLANET_GRAVITY } from "@/world/planet/config";
+import { groundUpXYZ } from "@/world/planet/up";
 import { VEHICLE, type VehicleTuning } from "./constants";
 import {
   airControl,
@@ -43,7 +44,17 @@ export interface StepEvents {
   trauma: number;
   /** Vertical speed of a landing that happened this step (0 = none) */
   landingSpeed: number;
+  /** Airtime (s) before that landing */
+  landingAirTime: number;
+  /** Speed lost this step in a crash (m/s; 0 = none) and its strength 0..1 */
+  crashSpeedLost: number;
+  crashStrength: number;
+  /** True on the step the car has been airborne for TAKEOFF_AIR seconds */
+  takeoff: boolean;
 }
+
+/** Airtime that counts as a real takeoff (bumps shorter than this don't) */
+const TAKEOFF_AIR = 0.25;
 
 const _q = new Quaternion();
 const _fwd = new Vector3();
@@ -57,9 +68,9 @@ const _axis = new Vector3();
 const _n = new Vector3();
 const _g = new Vector3();
 
-/** Gravity acceleration at a position. The game's is centre-pointing (applied by PlanetGravity). */
+/** Gravity acceleration at a position. The game's points down the local up (see planet/up.ts). */
 export type GravityFn = (position: Vector3, out: Vector3) => Vector3;
-export const planetGravity: GravityFn = (p, out) => out.copy(p).normalize().multiplyScalar(-PLANET_GRAVITY);
+export const planetGravity: GravityFn = (p, out) => groundUpXYZ(p.x, p.y, p.z, out).multiplyScalar(-PLANET_GRAVITY);
 
 export class VehicleDriver {
   readonly wheels: WheelTelemetry[] = Array.from({ length: WHEEL_COUNT }, () => ({
@@ -81,7 +92,14 @@ export class VehicleDriver {
   /** 0..1 how much the suspension is working (compression speed), for the rumble */
   suspensionActivity = 0;
   upright: UprightState = { flippedFor: 0, assisting: false };
-  readonly events: StepEvents = { trauma: 0, landingSpeed: 0 };
+  readonly events: StepEvents = {
+    trauma: 0,
+    landingSpeed: 0,
+    landingAirTime: 0,
+    crashSpeedLost: 0,
+    crashStrength: 0,
+    takeoff: false,
+  };
 
   private prevSpeed = 0;
   /** After a teleport/reset the car drops onto its wheels; that first touchdown isn't a "landing" */
@@ -110,6 +128,10 @@ export class VehicleDriver {
     this.prevLengths.fill(this.t.suspensionRest);
     this.events.trauma = 0;
     this.events.landingSpeed = 0;
+    this.events.landingAirTime = 0;
+    this.events.crashSpeedLost = 0;
+    this.events.crashStrength = 0;
+    this.events.takeoff = false;
   }
 
   step(input: DriveInput, dt: number): void {
@@ -125,7 +147,7 @@ export class VehicleDriver {
     _right.set(-1, 0, 0).applyQuaternion(_q); // car +X is its left side
     _up.set(0, 1, 0).applyQuaternion(_q);
     const p = rb.translation();
-    _planetUp.set(p.x, p.y, p.z).normalize();
+    groundUpXYZ(p.x, p.y, p.z, _planetUp);
     const lv = rb.linvel();
     _v.set(lv.x, lv.y, lv.z);
 
@@ -186,16 +208,19 @@ export class VehicleDriver {
     const wasAirTime = this.airTime;
     this.wheelsInContact = contacts;
     this.events.landingSpeed = 0;
+    this.events.takeoff = false;
     if (contacts > 0) {
       if (this.settling) {
         this.settling = false;
       } else if (wasAirTime >= t.landingMinAir && verticalIn > 0) {
         this.events.landingSpeed = verticalIn;
+        this.events.landingAirTime = wasAirTime;
         this.events.trauma += landingTrauma(verticalIn, t);
       }
       this.airTime = 0;
     } else {
       this.airTime += dt;
+      if (!this.settling && wasAirTime < TAKEOFF_AIR && this.airTime >= TAKEOFF_AIR) this.events.takeoff = true;
     }
     this.grounded = contacts > 0 || this.airTime < t.airborneDelay;
 
@@ -285,7 +310,16 @@ export class VehicleDriver {
 
     // --- Crash: sudden loss of speed in one step ---
     const dv = this.prevSpeed - this.speed;
-    if (dv > 0) this.events.trauma += crashTrauma(dv, t);
+    this.events.crashSpeedLost = 0;
+    this.events.crashStrength = 0;
+    if (dv > 0) {
+      const strength = crashTrauma(dv, t);
+      this.events.trauma += strength;
+      if (strength > 0) {
+        this.events.crashSpeedLost = dv;
+        this.events.crashStrength = strength / 0.9;
+      }
+    }
     this.prevSpeed = this.speed;
   }
 }

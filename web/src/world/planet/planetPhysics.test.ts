@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { Vector3 } from "three";
+import { PLANET_RADIUS } from "./config";
 import { latLonToDir } from "./frame";
 import { applyPlanetGravityStep } from "./gravity";
 import { terrainHeight } from "./terrain";
@@ -17,10 +18,10 @@ describe("planet physics", () => {
     console.info(`[terrain] Rapier trimesh collider created in ${(performance.now() - t0).toFixed(0)} ms`);
 
     const radius = 0.5;
-    // Spots on the gentle biomes (home, engineering, healthcare) and the opposite hemisphere.
-    const spots = [latLonToDir(10, 0), latLonToDir(25, 75), latLonToDir(-15, 140), latLonToDir(-40, -100)];
+    // Open ground between towns, around the planet (pads and roads aside: plain terrain faces)
+    const spots = [latLonToDir(0, 22), latLonToDir(0, 112), latLonToDir(0, -158), latLonToDir(0, -68)];
     const bodies = spots.map((dir) => {
-      const p = dir.clone().multiplyScalar(150 + terrainHeight(dir) + 4);
+      const p = dir.clone().multiplyScalar(PLANET_RADIUS + terrainHeight(dir) + 4);
       const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(p.x, p.y, p.z).setLinearDamping(2).setAngularDamping(2));
       world.createCollider(RAPIER.ColliderDesc.ball(radius).setFriction(1), body);
       return body;
@@ -33,7 +34,7 @@ describe("planet physics", () => {
       const t = body.translation();
       const p = new Vector3(t.x, t.y, t.z);
       const dir = p.clone().normalize();
-      const clearance = p.length() - (150 + terrainHeight(dir));
+      const clearance = p.length() - (PLANET_RADIUS + terrainHeight(dir));
       // A ball resting on a (possibly sloped) face: centre is ~radius above the surface.
       expect(clearance).toBeGreaterThan(radius * 0.8);
       expect(clearance).toBeLessThan(radius * 1.6);

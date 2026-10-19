@@ -9,6 +9,7 @@ import { BIOMES } from "@/world/planet/biomes";
 import { angleBetween, degToMetres, latLonToDir, surfacePose } from "@/world/planet/frame";
 import { analyticHeightXYZ, biomeAt } from "@/world/planet/terrain";
 import type { BiomeLayout, LatLon } from "@/world/planet/types";
+import { site } from "./site";
 
 export const BUDGET = { placements: 220, uniqueModels: 40, characters: 8, dynamic: 12 };
 
@@ -120,4 +121,61 @@ export function maxGrade(path: LatLon[]): number {
     if (run > 1e-6) worst = Math.max(worst, rise / run);
   }
   return worst;
+}
+
+/** Small-planet town budget (see budget.test.ts): footprints and markers within this of the centre */
+export const TOWN_RADIUS = 40;
+
+/**
+ * Things blocking a road lane: a strip `halfWidth` either side of the ray from `from` along compass
+ * `bearing` (degrees clockwise from north, in the biome centre's frame), out to TOWN_RADIUS.
+ * Blockers are placements taller than 0.6 m whose footprint circle reaches into the strip, markers in
+ * the strip, and small raised or sunken pads whose core reaches into it.
+ */
+export function laneBlockers(layout: BiomeLayout, from: LatLon, bearing: number, halfWidth = 6): string[] {
+  const biome = BIOMES.find((b) => b.id === layout.biome)!;
+  const s = site(biome.center);
+  const [n0, e0] = s.toNE(from);
+  const dn = Math.cos((bearing * Math.PI) / 180);
+  const de = Math.sin((bearing * Math.PI) / 180);
+  // Lane length: from the spawn to the TOWN_RADIUS circle
+  const b = n0 * dn + e0 * de;
+  const len = -b + Math.sqrt(b * b - (n0 * n0 + e0 * e0 - TOWN_RADIUS * TOWN_RADIUS));
+  const distToLane = (p: LatLon) => {
+    const [n, e] = s.toNE(p);
+    const t = Math.max(0, Math.min(len, (n - n0) * dn + (e - e0) * de));
+    return Math.hypot(n - (n0 + t * dn), e - (e0 + t * de));
+  };
+  const hits: string[] = [];
+  for (const p of layout.placements) {
+    const { min, max } = getModel(p.model);
+    const sc = p.scale ?? 1;
+    if ((p.y ?? 0) + max[1] * sc <= 0.6) continue;
+    const r = (Math.hypot(max[0] - min[0], max[2] - min[2]) / 2) * sc;
+    if (distToLane(p) < halfWidth + r) hits.push(p.model);
+  }
+  for (const m of layout.markers) if (distToLane(m) < halfWidth) hits.push(`marker ${m.id}`);
+  for (const p of layout.pads) {
+    if (p.radius > 8 || Math.abs(p.height ?? 0) < 0.5) continue;
+    if (degToMetres(angleBetween(p, from)) < p.radius) continue; // the spawn's own pad
+    if (distToLane(p) < halfWidth + p.radius) hits.push(`pad r=${p.radius} h=${p.height}`);
+  }
+  return hits;
+}
+
+/** Samples a polyline of anchor-frame (north, east) waypoints every `step` metres, as lat/lon. */
+export function polyline(s: ReturnType<typeof site>, pts: [number, number][], step = 1): LatLon[] {
+  const out: LatLon[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const [n0, e0] = pts[i - 1];
+    const [n1, e1] = pts[i];
+    const k = Math.max(1, Math.ceil(Math.hypot(n1 - n0, e1 - e0) / step));
+    for (let j = i === 1 ? 0 : 1; j <= k; j++) out.push(s.at(n0 + ((n1 - n0) * j) / k, e0 + ((e1 - e0) * j) / k));
+  }
+  return out;
+}
+
+/** Placement top above its base (metres), for "tallest landmark" checks. */
+export function topOf(p: { model: string; y?: number; scale?: number }): number {
+  return (p.y ?? 0) + getModel(p.model).max[1] * (p.scale ?? 1);
 }

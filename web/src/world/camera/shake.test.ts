@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { SHAKE, addTrauma, decayTrauma, noise1, rumbleAmount, shakeAmount, shakeOffsets, shakeState } from "./shake";
+import {
+  FOV_PUNCH,
+  SHAKE,
+  addFovPunch,
+  addTrauma,
+  crashFovPunch,
+  decayTrauma,
+  landingFovPunch,
+  noise1,
+  resetFovPunch,
+  rumbleAmount,
+  shakeAmount,
+  shakeOffsets,
+  shakeState,
+  stepFovPunch,
+} from "./shake";
 
 describe("trauma", () => {
   it("accumulates and clamps to 0..1; ignores non-positive amounts", () => {
@@ -61,5 +76,67 @@ describe("noise-based offsets", () => {
     expect(maxX).toBeLessThanOrEqual(SHAKE.maxOffset);
     const full = shakeOffsets(1, 2.71, o).x;
     expect(shakeOffsets(1, 2.71, o, 0.5).x).toBeCloseTo(full * 0.5);
+  });
+});
+
+describe("FOV punch", () => {
+  const fresh = () => ({ value: 0, velocity: 0 });
+  const run = (s: { value: number; velocity: number }, seconds: number) => {
+    let peak = 0;
+    for (let t = 0; t < seconds; t += 1 / 60) {
+      const v = stepFovPunch(1 / 60, s);
+      if (Math.abs(v) > Math.abs(peak)) peak = v;
+    }
+    return peak;
+  };
+
+  it("an impulse swells to about the requested degrees, then settles exactly to 0", () => {
+    const s = fresh();
+    addFovPunch(4, s);
+    expect(s.value).toBe(0); // no instant jump
+    const peak = run(s, 1.5);
+    expect(peak).toBeGreaterThan(3);
+    expect(peak).toBeLessThan(5);
+    expect(s.value).toBe(0);
+    expect(s.velocity).toBe(0);
+  });
+
+  it("negative punches narrow; the offset is capped", () => {
+    const s = fresh();
+    addFovPunch(-3, s);
+    expect(run(s, 0.3)).toBeLessThan(-2);
+    const big = fresh();
+    addFovPunch(100, big);
+    expect(Math.abs(run(big, 1))).toBeLessThanOrEqual(FOV_PUNCH.maxDeg);
+  });
+
+  it("is frame-rate independent (substepped)", () => {
+    const a = fresh();
+    const b = fresh();
+    addFovPunch(4, a);
+    addFovPunch(4, b);
+    for (let i = 0; i < 6; i++) stepFovPunch(1 / 60, a);
+    stepFovPunch(0.1, b);
+    expect(b.value).toBeCloseTo(a.value, 1);
+  });
+
+  it("event mappings: soft events don't punch, landings widen, crashes narrow", () => {
+    expect(landingFovPunch(0.05)).toBe(0);
+    expect(crashFovPunch(0.05)).toBe(0);
+    expect(landingFovPunch(1)).toBe(FOV_PUNCH.landingDeg);
+    expect(crashFovPunch(1)).toBe(FOV_PUNCH.crashDeg);
+    expect(landingFovPunch(0.5)).toBeGreaterThan(0);
+    expect(crashFovPunch(0.5)).toBeLessThan(0);
+  });
+
+  it("reset drops a punch in flight; non-finite input is ignored", () => {
+    const s = fresh();
+    addFovPunch(Number.NaN, s);
+    expect(s.velocity).toBe(0);
+    addFovPunch(3, s);
+    stepFovPunch(0.05, s);
+    expect(resetFovPunch(s)).toBe(0);
+    expect(s.value).toBe(0);
+    expect(s.velocity).toBe(0);
   });
 });

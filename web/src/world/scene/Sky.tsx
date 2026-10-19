@@ -4,9 +4,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { BackSide, Color, Fog, ShaderMaterial, Vector3, type Camera, type Mesh, type Scene } from "three";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { useAppStore } from "@/state/useAppStore";
-import { PSX_FOG, SMOOTH_FOG } from "@/world/psx/config";
 import { biomeAt } from "@/world/planet/terrain";
+import { FOG_RANGE, fogLift } from "./fog";
 import type { BiomeId } from "@/world/planet/types";
 import { vehicleState } from "@/world/vehicle/vehicleState";
 import {
@@ -129,7 +128,7 @@ export interface SkyProps {
   biome?: BiomeId;
   /** Manage scene.fog (linear, biome-tinted, night-aware). Default true. */
   fog?: boolean;
-  /** Fog range override (metres). Default: PSX 60–180, smooth 90–320. */
+  /** Fog range override (metres, at ground level). Default: FOG_RANGE (./fog). */
   fogNear?: number;
   fogFar?: number;
   /** Cloud threshold: lower = more cloud (0.4–0.75 sensible). */
@@ -144,11 +143,14 @@ const _night = { top: new Color(NIGHT.top), horizon: new Color(NIGHT.horizon), f
 /** The imperative sky: material, fog and per-frame update. React only holds the instance. */
 export class SkyRig {
   readonly material: ShaderMaterial;
-  readonly fog = new Fog(new Color(skyState.current.fog), PSX_FOG.near, PSX_FOG.far);
+  readonly fog = new Fog(new Color(skyState.current.fog), FOG_RANGE.near, FOG_RANGE.far);
   private readonly basis: SkyBasis = { up: new Vector3(), east: new Vector3(), north: new Vector3() };
   private frames = 0;
   private teleportSeen = -1;
   private prevFog: Scene["fog"] = null;
+  /** Fog range at ground level; `update` pushes it out with the camera's altitude (see fogLift) */
+  private fogNear: number = FOG_RANGE.near;
+  private fogFar: number = FOG_RANGE.far;
   /** Freeze cloud drift and twinkle (prefers-reduced-motion) */
   private still = false;
 
@@ -174,7 +176,6 @@ export class SkyRig {
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });
-    this.material.userData.psxSkip = true; // no vertex snapping on the sky
   }
 
   setStill(still: boolean): void {
@@ -193,6 +194,8 @@ export class SkyRig {
   }
 
   setFogRange(near: number, far: number): void {
+    this.fogNear = near;
+    this.fogFar = far;
     this.fog.near = near;
     this.fog.far = far;
   }
@@ -234,6 +237,9 @@ export class SkyRig {
     u.uCloudCover.value = opts.cloudCover;
     if (!this.still) u.uTime.value = time;
     this.fog.color.copy(_fogColor);
+    const lift = fogLift(camera.position.length());
+    this.fog.near = this.fogNear + lift;
+    this.fog.far = this.fogFar + lift;
   }
 
   dispose(): void {
@@ -249,7 +255,6 @@ export class SkyRig {
 export function Sky({ biome, fog = true, fogNear, fogFar, cloudCover = 0.56 }: SkyProps) {
   const mesh = useRef<Mesh>(null);
   const scene = useThree((s) => s.scene);
-  const psx = useAppStore((s) => s.psx);
   const reduced = usePrefersReducedMotion();
   const rig = useMemo(() => new SkyRig(), []);
   useEffect(() => () => rig.dispose(), [rig]);
@@ -271,8 +276,8 @@ export function Sky({ biome, fog = true, fogNear, fogFar, cloudCover = 0.56 }: S
   }, [fog, rig, scene]);
 
   useEffect(() => {
-    rig.setFogRange(fogNear ?? (psx ? PSX_FOG.near : SMOOTH_FOG.near), fogFar ?? (psx ? PSX_FOG.far : SMOOTH_FOG.far));
-  }, [rig, fogNear, fogFar, psx]);
+    rig.setFogRange(fogNear ?? FOG_RANGE.near, fogFar ?? FOG_RANGE.far);
+  }, [rig, fogNear, fogFar]);
 
   useFrame(({ camera, clock }) => {
     if (!mesh.current) return;

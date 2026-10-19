@@ -3,6 +3,7 @@
 // Everything writes into caller-owned vectors so per-frame code never allocates.
 import { Vector3 } from "three";
 import { clamp } from "@/world/lib/damping";
+import { PLANET_RADIUS } from "@/world/planet/config";
 import { surfaceRadius } from "@/world/planet/frame";
 import { tangentBasis } from "@/world/vehicle/spawn";
 
@@ -31,9 +32,14 @@ export const CAMERA = {
   /** Line of sight from the look point to the camera keeps this much air over the terrain (m) */
   losClearance: 0.6,
   losSamples: 8,
-  /** Intro orbit around the spawn: high enough to see the planet curve away */
-  orbitRadius: 60,
-  orbitHeight: 70,
+  /**
+   * Intro orbit: the camera circles the spawn's up axis far enough out to frame the whole globe,
+   * looking at the planet centre. `orbitTilt` (rad) leans it off that axis so the view swings around
+   * the spawn; `orbitFrame` is the framed radius as a multiple of PLANET_RADIUS (margin for hills,
+   * buildings and a ring of sky).
+   */
+  orbitTilt: 0.25,
+  orbitFrame: 1.2,
   orbitSpeed: 0.1,
   orbitSpeedReduced: 0.03,
   /** Seconds to fly from the orbit into the follow cam */
@@ -103,14 +109,29 @@ export function liftForLineOfSight(
   return lift;
 }
 
-/** Point on the intro orbit around `center` (on the ground) at `angle`, in its tangent plane. */
-export function orbitPosition(center: Vector3, up: Vector3, angle: number, out: Vector3): Vector3 {
+/**
+ * Intro orbit distance from the planet centre (m) that fits a sphere of PLANET_RADIUS × orbitFrame
+ * inside the narrower half of the view: the vertical FOV in landscape, the horizontal one on a
+ * portrait phone (which therefore orbits further out).
+ */
+export function orbitDistance(fovDeg: number, aspect: number): number {
+  const halfV = (fovDeg * Math.PI) / 360;
+  const halfH = Math.atan(Math.tan(halfV) * Math.max(aspect, 1e-3));
+  return (PLANET_RADIUS * CAMERA.orbitFrame) / Math.sin(Math.min(halfV, halfH));
+}
+
+/**
+ * Point on the intro orbit at `angle`: `distance` from the planet centre (the origin), `orbitTilt`
+ * off the unit `up` axis, circling it. The camera looks at the origin from here.
+ */
+export function orbitPosition(up: Vector3, angle: number, distance: number, out: Vector3): Vector3 {
   tangentBasis(up, _e, _n);
+  const side = Math.sin(CAMERA.orbitTilt) * distance;
   return out
-    .copy(center)
-    .addScaledVector(_e, Math.cos(angle) * CAMERA.orbitRadius)
-    .addScaledVector(_n, Math.sin(angle) * CAMERA.orbitRadius)
-    .addScaledVector(up, CAMERA.orbitHeight);
+    .copy(up)
+    .multiplyScalar(Math.cos(CAMERA.orbitTilt) * distance)
+    .addScaledVector(_e, Math.cos(angle) * side)
+    .addScaledVector(_n, Math.sin(angle) * side);
 }
 
 /** Re-project `v` onto the tangent plane of unit `up` and normalise; keeps `fallback` if degenerate. */

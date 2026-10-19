@@ -23,19 +23,18 @@ const BED_FLAT = ROAD_HALF_WIDTH + ROAD_BED_SHOULDER;
 const REACH = BED_FLAT + ROAD_BED_FEATHER;
 
 /**
- * Which biomes are linked: a loop around the planet (career order where the geography allows) plus
- * the badlands, which hang off the raceway and the clinic. Roads run between the biomes' spawns.
+ * Which biomes are linked: one loop through all eight towns. The biome centres zigzag between the
+ * two rings of a square antiprism, so each link joins nearest neighbours. Roads run between spawns.
  */
 export const ROAD_LINKS: readonly [BiomeId, BiomeId][] = [
   ["home", "raceway"],
   ["raceway", "engineering"],
-  ["engineering", "healthcare"],
+  ["engineering", "badlands"],
+  ["badlands", "healthcare"],
   ["healthcare", "gamedev"],
   ["gamedev", "financial"],
   ["financial", "opensource"],
   ["opensource", "home"],
-  ["raceway", "badlands"],
-  ["badlands", "healthcare"],
 ];
 
 /** Baked road: unit-direction polyline (flat xyz, ROAD_STEP apart) and the bed height at each point. */

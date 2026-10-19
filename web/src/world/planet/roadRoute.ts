@@ -2,18 +2,25 @@
 // it into roads.generated.ts (`npm run roads`; the runtime never routes). Pure maths over the
 // layouts and the pad-flattened terrain (without road beds, so routing never depends on itself).
 //
-// Per link: a strip grid (2 m cells) around the great circle between the two spawns; cells inside
+// Each road end is a town's road port (the open edge of a street tile, layout/planet/roadHubs.ts) or,
+// without one, the spawn. From a port the road runs straight out, square to the edge, for PORT_LEAD
+// metres, and the routing proper starts there.
+//
+// Per link: a strip grid (2 m cells) around the great circle between the two lead ends; cells inside
 // any placement's footprint (+ the road bed and a margin) or the parking rings are blocked; A* with
 // a slope penalty finds a path; string pulling + Chaikin turn the staircase into a smooth road; the
 // bed height is the terrain along the road, low-pass filtered so the ride is smooth.
 
+import { Vector3 } from "three";
 import { PLANET_LAYOUTS } from "@/world/layout/planet";
 import { PLANET_RADIUS } from "./config";
 import { layoutObstacles, type Obstacle } from "./obstacles";
+import { PORT_LEAD, findRoadPort, portPose } from "./roadPorts";
 import { latLonToDir } from "./sphere";
+import { smoothstep } from "./noise";
 import { groundHeightNoRoadsXYZ } from "./terrain";
 import { ROAD_BED_SHOULDER, ROAD_HALF_WIDTH, ROAD_LINKS, ROAD_STEP, type RoadData } from "./roads";
-import type { BiomeId, LatLon } from "./types";
+import type { BiomeId } from "./types";
 
 const R = PLANET_RADIUS;
 const CELL = 2;
@@ -39,14 +46,26 @@ const MAX_END_GAP = 40;
 const BED_MAX_GRADE = 0.24;
 /** Bed height low-pass: gaussian sigma in polyline points (ROAD_STEP apart) */
 const BED_SIGMA = 2;
+/** Points over which a port's level bed eases into the road's smoothed bed */
+const PIN_EASE = 6;
 
 type V3 = [number, number, number];
 
-const spawnOf = (id: BiomeId): LatLon => {
-  const l = PLANET_LAYOUTS.find((x) => x.biome === id);
-  if (!l) throw new Error(`No layout for biome "${id}"`);
-  return l.spawn;
-};
+/** Where the road from `here` toward `there` ends: the port's edge and the end of its straight lead
+ * (both the spawn when the town has no port for it). */
+function roadEnd(here: BiomeId, there: BiomeId): { edge: V3; lead: V3; port: boolean } {
+  const port = findRoadPort(here, there);
+  if (port) {
+    const p = portPose(port);
+    const edge = p.edge.clone().normalize();
+    const lead = p.edge.clone().addScaledVector(p.heading, PORT_LEAD).normalize();
+    return { edge: [edge.x, edge.y, edge.z], lead: [lead.x, lead.y, lead.z], port: true };
+  }
+  const l = PLANET_LAYOUTS.find((x) => x.biome === here);
+  if (!l) throw new Error(`No layout for biome "${here}"`);
+  const d = latLonToDir(l.spawn.lat, l.spawn.lon);
+  return { edge: [d.x, d.y, d.z], lead: [d.x, d.y, d.z], port: false };
+}
 
 interface Strip {
   a: V3;
@@ -59,9 +78,9 @@ interface Strip {
   v0: number;
 }
 
-function stripFor(from: LatLon, to: LatLon): Strip {
-  const A = latLonToDir(from.lat, from.lon);
-  const B = latLonToDir(to.lat, to.lon);
+function stripFor(from: V3, to: V3): Strip {
+  const A = new Vector3(...from);
+  const B = new Vector3(...to);
   const n = A.clone().cross(B).normalize();
   const t = n.clone().cross(A);
   const length = A.angleTo(B) * R;
@@ -77,6 +96,12 @@ function stripFor(from: LatLon, to: LatLon): Strip {
     nu: Math.ceil((length + 2 * STRIP_OVERSHOOT) / CELL) + 1,
     nv: Math.ceil((2 * STRIP_HALF) / CELL) + 1,
   };
+}
+
+/** Strip coordinates (u along, v to the left, metres) of a unit direction: the inverse of stripDir. */
+function stripUV(s: Strip, d: V3): [number, number] {
+  const dot = (a: V3) => a[0] * d[0] + a[1] * d[1] + a[2] * d[2];
+  return [Math.atan2(dot(s.t), dot(s.a)) * R, Math.asin(Math.max(-1, Math.min(1, dot(s.n)))) * R];
 }
 
 /** Unit direction at strip coordinates (u metres along, v metres to the left). */
@@ -131,7 +156,9 @@ class Heap {
 
 /** Routes one link. Throws if the two spawns are not connected by drivable, clear ground. */
 export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstacle[]): RoadData {
-  const s = stripFor(spawnOf(from), spawnOf(to));
+  const endA = roadEnd(from, to);
+  const endB = roadEnd(to, from);
+  const s = stripFor(endA.lead, endB.lead);
   const N = s.nu * s.nv;
   const idx = (i: number, j: number) => i * s.nv + j;
   const blocked = new Uint8Array(N);
@@ -339,6 +366,10 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
     at = next;
   }
 
+  // A port's road leaves from exactly the end of its lead
+  if (endA.port) pulled[0] = [0, 0];
+  if (endB.port) pulled[pulled.length - 1] = [s.length, 0];
+
   // Chaikin corner cutting (endpoints kept), corner by corner: a corner whose cut would clip an
   // obstacle or a steep bank stays as it is
   let line = pulled;
@@ -357,12 +388,31 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
     line = out;
   }
 
+  // The straight leads out of the ports go on the ends (they may cross a footprint's clearance: the
+  // tile edge they leave from is where the town wants its road)
+  // (B's lead is appended after resampling, so its points too sit exactly ROAD_STEP apart on the lead)
+  if (endA.port) line = [stripUV(s, endA.edge), ...line];
+  const fixedA = endA.port ? PORT_LEAD / ROAD_STEP : 0;
+  const fixedB = endB.port ? PORT_LEAD / ROAD_STEP : 0;
+  const leadB = (pts: [number, number][]): [number, number][] => {
+    if (!endB.port) return pts;
+    const e = stripUV(s, endB.edge);
+    const l = pts[pts.length - 1];
+    const tail: [number, number][] = [];
+    for (let k = fixedB - 1; k >= 0; k--) {
+      const f = k / fixedB;
+      tail.push([e[0] + (l[0] - e[0]) * f, e[1] + (l[1] - e[1]) * f]);
+    }
+    return [...pts, ...tail];
+  };
+
   // Resample to even ROAD_STEP spacing, then relax: every point slides toward the midpoint of its
   // neighbours (straightens wiggles, opens tight turns) unless that would put it on blocked ground.
-  let pts = resample(line);
+  // The leads stay straight.
+  let pts = leadB(resample(line));
   for (let round = 0; round < 4; round++) {
     for (let it = 0; it < 60; it++) {
-      for (let k = 1; k < pts.length - 1; k++) {
+      for (let k = 1 + fixedA; k < pts.length - 1 - fixedB; k++) {
         const p = pts[k];
         const mu = (pts[k - 1][0] + pts[k + 1][0]) / 2;
         const mv = (pts[k - 1][1] + pts[k + 1][1]) / 2;
@@ -371,8 +421,20 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
         if (sample(nu, nv).free) pts[k] = [nu, nv];
       }
     }
-    pts = resample(pts);
+    pts = leadB(resample(pts.slice(0, pts.length - fixedB)));
   }
+  // The turn out of each port: a smooth curve from 2 m along the lead, tangent to it, onto the route
+  // up to PORT_FILLET metres past the lead's end (a kink there would fold the ribbon's inner edge).
+  // The longest reach whose curve keeps its kerbs PORT_KERB_GAP off every footprint wins (in town
+  // the pads flatten the ground, so the bed's shoulder clearance is not needed there).
+  const cosKerb = near.map((o) => Math.cos((o.r + PORT_CLEARANCE) / R));
+  const free = ([u, v]: [number, number]) => {
+    const d = stripDir(s, u, v);
+    return near.every((o, k) => d[0] * o.x + d[1] * o.y + d[2] * o.z < cosKerb[k]);
+  };
+  if (endA.port) pts = fillet(pts, fixedA, free);
+  if (endB.port) pts = fillet([...pts].reverse(), fixedB, free).reverse();
+  pts = resampleBothEnds(pts);
 
   const dirs = pts.map(([u, v]) => stripDir(s, u, v));
   const raw = dirs.map((d) => groundHeightNoRoadsXYZ(d[0], d[1], d[2]));
@@ -388,7 +450,24 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
     return sum / wsum;
   });
 
-  // Cut and fill where the smoothed bed is still too steep: pull each steep pair together
+  // At a port the bed is the tile's own ground (the edge's), level along the lead, then eases into the
+  // smoothed bed: the ribbon meets the tile flush and the ground never pokes up through it
+  const pinned = bed.map(() => false);
+  const pin = (edge: number, step: 1 | -1, lead: number) => {
+    const level = raw[edge];
+    for (let k = 0; k <= lead + PIN_EASE; k++) {
+      const i = edge + step * k;
+      if (i < 0 || i >= bed.length) break;
+      const w = k <= lead ? 0 : smoothstep(lead, lead + PIN_EASE, k);
+      bed[i] = level + (bed[i] - level) * w;
+      pinned[i] = k <= lead;
+    }
+  };
+  if (endA.port) pin(0, 1, fixedA);
+  if (endB.port) pin(bed.length - 1, -1, fixedB);
+
+  // Cut and fill where the smoothed bed is still too steep: pull each steep pair together (a pinned
+  // point stays put and its neighbour takes the whole correction)
   const run = dirs.map((d, i) => (i === 0 ? 0 : Math.hypot(d[0] - dirs[i - 1][0], d[1] - dirs[i - 1][1], d[2] - dirs[i - 1][2]) * R));
   for (let it = 0; it < 500; it++) {
     let steep = false;
@@ -397,10 +476,15 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
       const rise = bed[i] - bed[i - 1];
       if (Math.abs(rise) <= limit) continue;
       steep = true;
-      const mid = (bed[i] + bed[i - 1]) / 2;
-      const half = (Math.sign(rise) * limit) / 2;
-      bed[i] = mid + half;
-      bed[i - 1] = mid - half;
+      if (pinned[i] && pinned[i - 1]) continue;
+      if (pinned[i - 1]) bed[i] = bed[i - 1] + Math.sign(rise) * limit;
+      else if (pinned[i]) bed[i - 1] = bed[i] - Math.sign(rise) * limit;
+      else {
+        const mid = (bed[i] + bed[i - 1]) / 2;
+        const half = (Math.sign(rise) * limit) / 2;
+        bed[i] = mid + half;
+        bed[i - 1] = mid - half;
+      }
     }
     if (!steep) break;
   }
@@ -411,6 +495,80 @@ export function routeLink(from: BiomeId, to: BiomeId, obstacles: readonly Obstac
     points: dirs.flat().map((x) => Math.round(x * 1e6) / 1e6),
     heights: bed.map((h) => Math.round(h * 100) / 100),
   };
+}
+
+/** Longest reach past a port's lead over which the road turns onto its route, metres */
+export const PORT_FILLET = 24;
+/** Within a port's lead and turn, the road's centre line keeps this far off footprints: the paved
+ * width (tiles are 1.02 × 8 m) plus a gap, metres */
+export const PORT_CLEARANCE = 4.08 + 0.6;
+
+/**
+ * Replaces the start of `pts` (a port end: `lead` straight points from the edge, ROAD_STEP apart) from
+ * ROAD_STEP along the lead to PORT_FILLET metres past it by a cubic Hermite curve, tangent at both ends
+ * (its curvature at the ends is about 6·sin(angle off the chord) / chord, hence the long reach).
+ */
+function fillet(pts: [number, number][], lead: number, free: (q: [number, number]) => boolean): [number, number][] {
+  const i0 = 1;
+  for (let reach = PORT_FILLET; reach >= ROAD_STEP * 2; reach -= ROAD_STEP * 2) {
+    const i1 = Math.min(pts.length - 2, lead + reach / ROAD_STEP);
+    if (i1 <= i0 + 1) break;
+    const curve = hermite(pts, i0, i1);
+    // The lead itself belongs to the port; the rest of the curve keeps clear like the route does
+    if (curve.every((q, k) => k < lead * 4 || free(q))) return [...pts.slice(0, i0 + 1), ...curve, ...pts.slice(i1)];
+  }
+  return pts;
+}
+
+/** Points (0.5 m apart, ends excluded) of the cubic Hermite from pts[i0] to pts[i1], tangent to the polyline at both. */
+function hermite(pts: [number, number][], i0: number, i1: number): [number, number][] {
+  const unit = (a: [number, number], b: [number, number]): [number, number] => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  };
+  const p0 = pts[i0];
+  const p1 = pts[i1];
+  const t0 = unit(pts[0], pts[i0]);
+  const t1 = unit(pts[i1 - 1], pts[i1 + 1]);
+  const d = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+  const curve: [number, number][] = [];
+  const n = Math.ceil(d / 0.5);
+  for (let k = 1; k < n; k++) {
+    const t = k / n;
+    const h00 = 2 * t ** 3 - 3 * t ** 2 + 1;
+    const h10 = t ** 3 - 2 * t ** 2 + t;
+    const h01 = -2 * t ** 3 + 3 * t ** 2;
+    const h11 = t ** 3 - t ** 2;
+    curve.push([
+      h00 * p0[0] + h10 * d * t0[0] + h01 * p1[0] + h11 * d * t1[0],
+      h00 * p0[1] + h10 * d * t0[1] + h01 * p1[1] + h11 * d * t1[1],
+    ]);
+  }
+  return curve;
+}
+
+/** Like resample, but stepping in from both ends to the middle, so both ends' rows are ROAD_STEP apart. */
+function resampleBothEnds(line: readonly [number, number][]): [number, number][] {
+  let total = 0;
+  for (let k = 1; k < line.length; k++) total += Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]);
+  // Split at the middle
+  const a: [number, number][] = [line[0]];
+  let run = 0;
+  let k = 1;
+  for (; k < line.length; k++) {
+    const len = Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]);
+    if (run + len >= total / 2) {
+      const f = (total / 2 - run) / len;
+      a.push([line[k - 1][0] + (line[k][0] - line[k - 1][0]) * f, line[k - 1][1] + (line[k][1] - line[k - 1][1]) * f]);
+      break;
+    }
+    run += len;
+    a.push(line[k]);
+  }
+  const b: [number, number][] = [a[a.length - 1], ...line.slice(k)];
+  const first = resample(a);
+  const second = resample(b.reverse()).reverse();
+  return [...first, ...second.slice(1)];
 }
 
 /** Points every ROAD_STEP metres along a polyline (last point kept). */
@@ -430,7 +588,8 @@ function resample(line: readonly [number, number][]): [number, number][] {
   }
   const end = line[line.length - 1];
   const tail = pts[pts.length - 1];
-  if (Math.hypot(end[0] - tail[0], end[1] - tail[1]) > 0.5) pts.push(end);
+  // A short stub at a turn folds the ribbon's inner edge (turn × half-width > step): merge it instead
+  if (Math.hypot(end[0] - tail[0], end[1] - tail[1]) > ROAD_STEP * 0.6) pts.push(end);
   else pts[pts.length - 1] = end;
   return pts;
 }

@@ -1,20 +1,23 @@
 // Biome layout: raceway — "Speed King Canyon" (biome agent A). The launch centrepiece.
 //
-// A dirt stadium circuit on a flattened red-dirt valley floor: an asphalt start/finish straight on
-// the south side (gantry, banner towers, chequered flags, grandstands), then dirt all the way round,
-// with two earthen kickers on the back straight and raised berms on the outside of both hairpins.
-// The infield holds the pit garage you can drive into (two 4.5 m bays) and an open tent row.
-// Natural canyon hills and two mesas ring the valley. Lap ≈ 240 m; flowing at 15–25 m/s.
+// A dirt stadium circuit on a flattened red-dirt valley floor, everything within 40 m of the centre.
+// The asphalt start/finish straight runs along the north side (gantry, banner towers, chequered
+// flags), with the camera tower on the infield grass past the line. Behind the straight sits the
+// paddock: the drive-in pit garage (two bays) with the tent, kart and mechanic tight against its
+// east wall. The whole south side reads as one spectator row — two grandstands and the big Speed
+// King billboard behind the low wall, red/green flags flanking the kicker exits, trees bookending
+// the row and a maintenance corner (tractor, loose tyre) behind its west end. The hairpins run out
+// onto open flat dirt, red/white barriers hugging their outside; two earthen kickers sit on the
+// back straight. The spawn is on the grid; the road lanes leave north-west (to Hometown) and
+// north-east (to Downtown), so the north side past the straight is kept clear. Lap ≈ 130 m.
 //
-//                          N
-//                ▲ mesa                 ▲ mesa
-//        ╭─────── back straight (kickers ⌒ ⌒) ───────╮
-//  berm )                                             ( berm
-//       │   [tent row]   [PIT GARAGE]                  │
-//       │      ● speed-king  ↓ open                    │      [billboard]
-//        ╰══ spawn → ═══ START ▥ asphalt ═══════════════╯
-//             [stands] [stands] [covered] [covered]
-//                          S
+//                            N
+//                ↖ lane                  lane ↗
+//        ╭══ spawn → ══ ▥ START ════════════════════╮
+//  dirt )   [PIT GARAGE][tent]  ● speed-king  [camera]
+//        ╰──────── back straight (kickers ⌒ ⌒) ──────╯
+//   [tractor] [tree] [stand] [BILLBOARD] [stand] [tree]
+//                            S
 import type { BiomeLayout, PlanetPlacement } from "@/world/planet/types";
 import { BIOMES } from "@/world/planet/biomes";
 import { author, yawToward } from "./a/kit";
@@ -23,8 +26,8 @@ const CENTER = BIOMES.find((b) => b.id === "raceway")!.center;
 const { at, place, placeC, marker, spawn } = author(CENTER);
 
 // Stadium track: straights at n = ±HALF, hairpins centred on (0, ±TURN_E) with centreline radius HALF.
-const HALF = 22;
-const TURN_E = 26;
+const HALF = 13;
+const TURN_E = 15;
 const DEG = Math.PI / 180;
 
 /** Point on a circle around a hairpin centre: phi = 0 points away from the infield (east / west). */
@@ -32,150 +35,128 @@ function turnPoint(side: 1 | -1, radius: number, phiDeg: number): [number, numbe
   return [radius * Math.sin(phiDeg * DEG), side * (TURN_E + radius * Math.cos(phiDeg * DEG))];
 }
 
-// --- Start/finish straight (south, heading east): racing asphalt on the flat pad ---------------
+// --- Start/finish straight (north, heading east): racing asphalt on the flat valley floor --------
 const straight: PlanetPlacement[] = [
-  place(-HALF, -20, { model: "racing-kit/roadStraight", yaw: -90 }),
-  place(-HALF, -12, { model: "racing-kit/roadStraightArrow", yaw: -90 }),
-  place(-HALF, -4, { model: "racing-kit/roadStraight", yaw: -90 }),
-  // 16 m start piece with the gantry: local z −12..4 runs east, so its centre lands at e = 8
-  place(-HALF, 12, { model: "racing-kit/roadStart", yaw: -90 }),
-  place(-HALF, 20, { model: "racing-kit/roadStraight", yaw: -90 }),
-  // banner towers and chequered flags framing the line
-  placeC(-HALF - 7.5, -24, { model: "racing-kit/bannerTowerRed", yaw: 0 }),
-  placeC(-HALF + 7.5, -24, { model: "racing-kit/bannerTowerGreen", yaw: 0 }),
-  placeC(-HALF - 7.5, 28, { model: "racing-kit/bannerTowerGreen", yaw: 0 }),
-  placeC(-HALF + 7.5, 28, { model: "racing-kit/bannerTowerRed", yaw: 0 }),
-  placeC(-HALF - 6, 1, { model: "racing-kit/flagCheckers", yaw: 90 }),
-  placeC(-HALF + 6, 1, { model: "racing-kit/flagCheckers", yaw: 90 }),
-  placeC(-HALF - 6.5, -10, { model: "racing-kit/lightPostLarge", yaw: 0 }),
-  placeC(-HALF - 6.5, 18, { model: "racing-kit/lightPostLarge", yaw: 0 }),
+  place(HALF, -12, { model: "racing-kit/roadStraight", yaw: -90 }),
+  place(HALF, -4, { model: "racing-kit/roadStraightArrow", yaw: -90 }),
+  // The start line: two plain 8 m tiles (a 16 m piece would lift its far corners ~0.9 m off the curved
+  // ground; every tile now stands on the ground) under the kit's start gantry, 4 m past the arrow tile
+  place(HALF, 4, { model: "racing-kit/roadStraight", yaw: -90 }),
+  place(HALF, 12, { model: "racing-kit/roadStraight", yaw: -90 }),
+  placeC(HALF, 8, { model: "racing-kit/overhead", yaw: -90, collider: "none" }), // its legs stand outside the 8 m road
+  // banner towers on the infield side, framing the straight; chequered flags at the line
+  placeC(HALF - 8.5, -20, { model: "racing-kit/bannerTowerRed", yaw: 0, y: -0.35 }), // 7 m+ clear of the pit garage
+  placeC(HALF - 7.5, 18, { model: "racing-kit/bannerTowerGreen", yaw: 0, y: -0.2 }),
+  placeC(HALF - 6, 1, { model: "racing-kit/flagCheckers", yaw: 90, y: -0.15 }),
+  placeC(HALF + 6, 1, { model: "racing-kit/flagCheckers", yaw: 90, y: -0.2 }),
 ];
 
-// --- Grandstands south of the straight, facing north (the kit's stands face their local +Z) -------------------------------------------
+// --- Spectator row (south): two grandstands and the billboard behind the back straight, facing
+// north across the circuit; the trees in `canyon` bookend the row's ends -------------------------
 const stands: PlanetPlacement[] = [
-  placeC(-35, -18, { model: "racing-kit/grandStand", yaw: 0 }),
-  placeC(-35, -10, { model: "racing-kit/grandStand", yaw: 0 }),
-  placeC(-35, -2, { model: "racing-kit/grandStandCovered", yaw: 0 }),
-  placeC(-35, 6, { model: "racing-kit/grandStandCovered", yaw: 0 }),
-  placeC(-35, 14, { model: "racing-kit/grandStandAwning", yaw: 0 }),
-  placeC(-35, 22, { model: "racing-kit/grandStand", yaw: 0 }),
-  placeC(-30, -28, { model: "racing-kit/camera_exclusive", yaw: 30 }),
+  placeC(-23, -13.5, { model: "racing-kit/grandStandCovered", yaw: 0, y: -0.2 }),
+  placeC(-23, 13.5, { model: "racing-kit/grandStand", yaw: 0, y: -0.2 }),
 ];
 
-// --- Hairpins: red/white barriers on the outside, tyre stacks on the inside apex ---------------
+// --- Hairpins: red/white barriers hugging the outside of each turn, on the flat valley floor.
+// The north-west quarter of the west hairpin stays open: the road to Hometown leaves across it.
+//
+// The barrier models' origin sits ~5 m from their footprint centre (a Kenney corner origin), so the
+// pose's tangent plane is anchored well inside the ring and the base rides the sphere's curvature:
+// every barrier floats a near-uniform ~0.4 m (the ring is only ~18 m out on the 90 m planet; the
+// measured worst corners are 0.40..0.47). One constant grounds them all — the residual ±0.05 stays
+// inside the grounding tolerances (grounded.test.ts), no per-barrier table needed.
+const BARRIER_SINK = -0.43;
 const turns: PlanetPlacement[] = [];
 for (const side of [1, -1] as const) {
-  [-80, -55, -30, -5, 20, 45, 70].forEach((phi, i) => {
-    const [n, e] = turnPoint(side, HALF + 6.5, phi);
+  const phis = side === 1 ? [-75, -50, -25, 0, 25, 50, 75] : [-75, -50, -25, 0];
+  phis.forEach((phi, i) => {
+    const [n, e] = turnPoint(side, HALF + 5, phi);
     const [rn, re] = [n, e - side * TURN_E]; // radial direction
     turns.push(
       placeC(n, e, {
         model: i % 2 ? "racing-kit/barrierWhite" : "racing-kit/barrierRed",
         yaw: yawToward(rn, re),
         scale: 1.5,
+        y: BARRIER_SINK,
       }),
     );
   });
-  for (const phi of [-40, 0, 40]) {
-    const [n, e] = turnPoint(side, HALF - 7, phi);
-    turns.push(place(n, e, { model: "car-kit/wheel-dark", y: 0.5, yaw: phi * side }));
-    turns.push(place(n + 0.9, e, { model: "car-kit/wheel-dark", y: 0.5, yaw: phi * side }));
-    turns.push(place(n + 0.45, e, { model: "car-kit/wheel-dark", y: 1.5, yaw: phi * side }));
-  }
+  const [n, e] = turnPoint(side, HALF - 7, 0);
+  turns.push(place(n, e, { model: "car-kit/wheel-dark", y: 0.5 }));
+  turns.push(place(n + 0.9, e, { model: "car-kit/wheel-dark", y: 0.5 }));
+  turns.push(place(n + 0.45, e, { model: "car-kit/wheel-dark", y: 1.5 }));
 }
 
-// --- Back straight (north): barrier wall on the outside, flags at the kickers --------------------
-const back: PlanetPlacement[] = [];
-for (const e of [-20, -4, 12]) {
-  back.push(placeC(HALF + 7, e + 4, { model: "racing-kit/barrierWall", yaw: 180 }));
-}
-back.push(
-  placeC(HALF - 6.5, -6, { model: "racing-kit/flagRed", yaw: 90 }),
-  placeC(HALF - 6.5, 10, { model: "racing-kit/flagGreen", yaw: 90 }),
-  placeC(HALF + 8.5, 26, { model: "racing-kit/treeLarge" }),
-  placeC(HALF + 9, -28, { model: "racing-kit/treeSmall" }),
-);
+// --- Back straight (south): a low wall between the kickers and the spectator row; red and green
+// flags flanking the kicker exits, just past the wall's ends in front of the stands ---------------
+const back: PlanetPlacement[] = [
+  placeC(-HALF - 6, -4, { model: "racing-kit/barrierWall", yaw: 0 }),
+  placeC(-HALF - 6, 4, { model: "racing-kit/barrierWall", yaw: 0 }),
+  placeC(-HALF - 5.4, -9.2, { model: "racing-kit/flagRed", yaw: 90 }),
+  placeC(-HALF - 5.4, 9.2, { model: "racing-kit/flagGreen", yaw: 90 }),
+];
 
-// --- Infield: pit garage (drive-in) and the open tent row ---------------------------------------
-// pitsGarage at scale 1.8: 14.4 m wide, two 4.5 m bays split by a centre pillar, ceiling ≈ 6.3 m.
-// The shell has no collider; three fences (back + sides) and a post inside the pillar give it walls.
-const G: [number, number] = [-4, 10];
-const GS = 1.8;
+// --- Paddock (infield): the pit garage (drive-in, planar floor) with the tent, kart and mechanic
+// tight against its east wall, and the camera tower by the start line filming the grid ------------
+// pitsGarage at scale 2: 16 m wide, two ~7 m bays split by a centre pillar, ceiling ≈ 11 m,
+// opening north onto the start straight. The shell has no collider; three fences (back + sides) and
+// a post inside the pillar give it walls.
+const G: [number, number] = [-0.5, -3];
+const GS = 2;
+const PIT = at(...G);
+/** The 16 m shell's corners reach past the planar floor's rim, where the ground falls away: sunk to meet it */
+const PIT_Y = -0.5;
 const pits: PlanetPlacement[] = [
-  place(G[0], G[1], { model: "racing-kit/pitsGarage", yaw: 180, scale: GS, collider: "none" }),
-  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: 0, scale: GS }), // back (north)
-  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: 90, scale: GS }), // west side
-  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: -90, scale: GS }), // east side
-  place(G[0] - 7, G[1], { model: "factory-kit/structure-tall" }), // collider for the centre pillar
-  // inside: a spare race car parked in the east bay (the west bay stays clear), crate and tyre at the back
-  place(G[0] + 1, G[1] + 3.1, { model: "car-kit/race", yaw: 180 }),
-  place(G[0] + 5.2, G[1] - 6, { model: "car-kit/box" }),
-  place(G[0] + 5.2, G[1] + 6, { model: "car-kit/wheel-racing", y: 0.5, yaw: 90 }),
-  place(G[0] - 5, G[1] + 12.5, { model: "racing-kit/pitsOffice", yaw: 180 }),
-  place(G[0] + 4, G[1] + 18, { model: "racing-kit/radarEquipment", yaw: 200 }),
-  // the open tent row west of the garage (posts only, no collider: drive through it)
-  placeC(-4, -12, { model: "racing-kit/tentLong", collider: "none" }),
-  place(-2, -16, { model: "car-kit/kart-oobi", yaw: 160 }),
-  place(-2, -8, { model: "car-kit/kart-oozi", yaw: 200 }),
-  place(-7, -12.5, { model: "mini-characters/character-male-c", yaw: 180, anim: "interact-right" }),
-  place(-14, 21, { model: "mini-characters/character-female-a", yaw: 180, anim: "emote-yes" }),
-  place(-11.5, 4, { model: "racing-kit/billboardLower", yaw: 180 }),
+  place(G[0], G[1], { model: "racing-kit/pitsGarage", yaw: 0, scale: GS, collider: "none", y: PIT_Y, plane: PIT }),
+  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: 180, scale: GS, y: PIT_Y, plane: PIT }), // back (south)
+  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: 90, scale: GS, y: PIT_Y, plane: PIT }), // west side
+  place(G[0], G[1], { model: "racing-kit/fenceStraight", yaw: -90, scale: GS, y: PIT_Y, plane: PIT }), // east side
+  place(G[0] + 3.87 * GS, G[1], { model: "factory-kit/structure-tall", plane: PIT }), // collider for the centre pillar
+  // inside: a spare race car in the east bay (the west bay stays clear), a tyre against the back wall
+  place(G[0] - 1, G[1] + 3.8, { model: "car-kit/race", yaw: 0, plane: PIT }),
+  place(G[0] - 6.5, G[1] + 5.5, { model: "car-kit/wheel-racing", y: 0.5, yaw: 90, plane: PIT }),
+  // the open tent east of the garage (posts only, no collider: drive through it) with a kart
+  placeC(-3.5, 10.5, { model: "racing-kit/tent", collider: "none", y: -0.2 }),
+  place(-3, 10, { model: "car-kit/kart-oobi", yaw: 160 }),
+  place(-6, 8.5, { model: "mini-characters/character-male-c", yaw: 180, anim: "interact-right" }),
+  // the camera tower on the infield grass past the start line, a spotter beside it
+  placeC(7, 6, { model: "racing-kit/camera_exclusive", yaw: 250, y: -0.2 }),
+  place(5, 3.5, { model: "mini-characters/character-female-a", yaw: -50, anim: "emote-yes" }),
 ];
 
-// --- The big double billboard straight ahead of the start, beyond the east hairpin --------------
-const billboard: PlanetPlacement[] = [
-  placeC(-32, 50, { model: "racing-kit/billboardDouble_exclusive", yaw: 90, scale: 1.6 }),
-  placeC(-30, 41, { model: "racing-kit/treeSmall" }),
-];
+// --- The big double billboard behind the back straight, facing the grid across the infield -------
+const billboard: PlanetPlacement[] = [placeC(-24, 0, { model: "racing-kit/billboardDouble_exclusive", yaw: 0, scale: 1.5, y: -0.4 })];
 
-// --- Knockables: cones at the infield chicane and loose tyres ----------------------------------
-const props: PlanetPlacement[] = [
-  place(HALF - 3, -14, { model: "car-kit/cone", body: "dynamic" }),
-  place(HALF - 3, -12, { model: "car-kit/cone", body: "dynamic" }),
-  place(HALF - 3, 2, { model: "car-kit/cone", body: "dynamic" }),
-  place(HALF - 3, 4, { model: "car-kit/cone", body: "dynamic" }),
-  place(-HALF + 4, 30, { model: "car-kit/cone", body: "dynamic" }),
-  place(-HALF + 4, -28, { model: "car-kit/cone", body: "dynamic" }),
-  place(10, 50, { model: "car-kit/debris-tire", body: "dynamic", y: 0.5 }),
-  place(12, 50.5, { model: "car-kit/debris-tire", body: "dynamic", y: 0.5 }),
-  place(-10, -50, { model: "car-kit/debris-tire", body: "dynamic", y: 0.5 }),
-  place(-12, -49.5, { model: "car-kit/debris-tire", body: "dynamic", y: 0.5 }),
-];
+// --- Maintenance corner behind the spectator row's west end: the parked tractor's loose tyre -----
+const props: PlanetPlacement[] = [place(-23.5, -27.5, { model: "car-kit/debris-tire", body: "dynamic", y: 0.5 })];
 
-// --- Canyon dressing outside the circuit --------------------------------------------------------
+// --- Canyon dressing outside the circuit: trees bookending the spectator row, the tractor parked
+// behind its west end and one standing north of the gantry -----------------------------------------
 const canyon: PlanetPlacement[] = [
-  placeC(46, -18, { model: "racing-kit/treeLarge" }),
-  placeC(42, 32, { model: "racing-kit/treeLarge" }),
-  placeC(38, -40, { model: "racing-kit/treeSmall" }),
-  placeC(-50, 26, { model: "racing-kit/treeSmall" }),
-  placeC(-46, -36, { model: "racing-kit/treeLarge" }),
-  place(-44, 44, { model: "car-kit/truck-flat", yaw: 120 }),
-  place(-46, 38, { model: "car-kit/tractor-shovel", yaw: 70 }),
-  place(34, 56, { model: "city-roads/construction-barrier", yaw: -30 }),
-  place(36, 4, { model: "city-roads/sign-highway", yaw: 0 }),
+  placeC(30, 12, { model: "racing-kit/treeLarge", y: -0.15 }),
+  placeC(-28, 17, { model: "racing-kit/treeSmall", y: -0.35 }),
+  placeC(-26, -17, { model: "racing-kit/treeLarge" }),
+  place(-20, -30, { model: "car-kit/tractor-shovel", yaw: 70, y: -0.35 }),
 ];
 
 export const racewayLayout: BiomeLayout = {
   biome: "raceway",
-  // On the grid, facing east down the start straight toward the gantry and the billboard
-  spawn: spawn(-HALF, -22, -90),
+  // On the grid, facing east down the start straight toward the gantry
+  // (e −16: far enough west that the road lanes clear the wide pit garage)
+  spawn: spawn(HALF, -16, -90),
   pads: [
-    // the valley floor: whole circuit, stands and infield, dug 1 m below the natural centre
-    { ...at(0, 0), radius: 56, blend: 12, height: -1 },
-    // two kickers on the back straight
-    { ...at(HALF, -6), radius: 2.5, blend: 4, height: 1.3 },
-    { ...at(HALF, 10), radius: 2.5, blend: 4, height: 1.5 },
-    // berms on the outside of both hairpins (banked by their blend)
-    { ...at(...turnPoint(1, HALF + 11, -20)), radius: 4, blend: 7, height: 2.2 },
-    { ...at(...turnPoint(1, HALF + 11, 25)), radius: 4, blend: 7, height: 2.2 },
-    { ...at(...turnPoint(-1, HALF + 11, -20)), radius: 4, blend: 7, height: 2.2 },
-    { ...at(...turnPoint(-1, HALF + 11, 25)), radius: 4, blend: 7, height: 2.2 },
-    // a roller in the west hairpin
-    { ...at(...turnPoint(-1, HALF, 0)), radius: 2.5, blend: 4, height: 0.8 },
-    // mesas closing the canyon to the north
-    { ...at(48, -22), radius: 7, blend: 9, height: 5 },
-    { ...at(46, 30), radius: 7, blend: 9, height: 5 },
+    // the valley floor: circuit, stands and infield, dug 1 m below the natural centre
+    { ...at(0, 0), radius: 34, blend: 10, height: -1 },
+    // A pad's `height` is relative to the natural ground at ITS centre, which rolls by several metres
+    // across the valley; these are tuned so each sits at the level noted, relative to the floor
+    // (raceway.test.ts pins those levels).
+    // the pit garage's planar floor: 0.25 m below the valley floor, so its rim meets the curved floor
+    { ...PIT, radius: 9.5, blend: 3, planar: true, height: -1.74 },
+    // two kickers on the back straight: floor + 1.3 m and + 1.5 m
+    { ...at(-HALF, -6), radius: 2.5, blend: 4, height: 0.33 },
+    { ...at(-HALF, 6), radius: 2.5, blend: 4, height: -2.63 },
   ],
-  markers: [marker(-13, -6, { id: "speed-king", kind: "game", label: "Speed King" })],
+  markers: [marker(4, 9.5, { id: "speed-king", kind: "game", label: "Speed King" })],
   placements: [...straight, ...stands, ...turns, ...back, ...pits, ...billboard, ...props, ...canyon],
 };

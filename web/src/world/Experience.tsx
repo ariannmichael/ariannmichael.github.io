@@ -12,15 +12,18 @@ import { FollowCamera } from "./camera/FollowCamera";
 import { TeleportFade } from "./camera/TeleportFade";
 import { KEYMAP } from "./controls";
 import { WheelDust } from "./fx/WheelDust";
+import { Juice } from "./fx/Juice";
+import { AudioSystem } from "./audio/AudioSystem";
 import { useDebugStore } from "./debug/debugStore";
 import { PLANET_LAYOUTS } from "./layout/planet";
 import { byDistance, districtOfBiome, layoutCap, spawnForDistrict } from "./lib/biomeMap";
 import { latLonToDir } from "./planet/frame";
 import { useAfterFirstPaint } from "./lib/idle";
+import { pickDpr, readDisplay } from "./lib/mobileQuality";
 import { PlanetGravity } from "./planet/PlanetGravity";
 import { PlanetGround } from "./planet/PlanetGround";
 import { Roads } from "./roads/Roads";
-import { PsxPipeline } from "@/world/psx";
+import { CozyPass } from "./scene/CozyPass";
 import { Lighting } from "./scene/Lighting";
 import { Sky } from "./scene/Sky";
 import { loadSpawnLayout, preloadInBackground } from "./town/assets";
@@ -54,8 +57,10 @@ export default function Experience({ district }: { district: DistrictId }) {
   const setQuality = useAppStore((s) => s.setQuality);
   const paused = useAppStore((s) => s.mode === "card" || s.gpsOpen);
   const physicsDebug = useDebugStore((s) => s.physics);
-  const psx = useAppStore((s) => s.psx);
   const high = quality === "high";
+  // Touch screens cap the drawing-buffer size (read once: rotating keeps the pixel count)
+  const [display] = useState(readDisplay);
+  const dpr = useMemo(() => pickDpr(quality, display), [quality, display]);
   const [biome, setBiome] = useState<BiomeId>();
   // The planet trimesh build (~100 ms) and the car wait for the first paint, behind the loader
   const worldReady = useAfterFirstPaint();
@@ -113,11 +118,13 @@ export default function Experience({ district }: { district: DistrictId }) {
       )}
       <KeyboardControls map={KEYMAP}>
         <Canvas
-          // PSX renders into a low-res target anyway, and swaps shadow maps for a blob shadow
-          shadows={high && !psx ? "percentage" : false}
-          dpr={psx ? 1 : high ? [1, 2] : 1}
+          // Lite swaps shadow maps for a blob shadow (Lighting) and renders at 1x (touch: up to 1.5x, see mobileQuality)
+          shadows={high ? "percentage" : false}
+          dpr={dpr}
           flat
-          gl={{ antialias: true, powerPreference: "high-performance" }}
+          // No canvas MSAA: the scene renders into CozyPass's target (which has its own samples), so the
+          // canvas only ever receives one fullscreen triangle
+          gl={{ antialias: false, powerPreference: "high-performance" }}
           camera={{ fov: 55, near: 0.1, far: 1000, position: [0, 200, 200] }}
           data-district={district}
           // The Canvas wrapper is a <div>: aria-label is only allowed on it with a role
@@ -132,6 +139,8 @@ export default function Experience({ district }: { district: DistrictId }) {
           {/* Tint follows the biome under the car (auto-tracks the camera until the car reports one) */}
           <Sky biome={biome} />
           <Lighting />
+          {/* The cozy grade owns the frame's final render (see CozyPass) */}
+          <CozyPass />
 
           <Suspense fallback={null}>
             {worldReady && (
@@ -154,12 +163,12 @@ export default function Experience({ district }: { district: DistrictId }) {
             )}
             {worldReady && <DistrictTracker onBiome={setBiome} />}
             {worldReady && <WheelDust />}
+            {worldReady && <Juice />}
+            {worldReady && <AudioSystem />}
           </Suspense>
 
           <FollowCamera />
           <TeleportFade />
-          {/* Reads the store's psx flag: low-res target + dither when on, normal render when off */}
-          <PsxPipeline />
         </Canvas>
       </KeyboardControls>
     </>
@@ -184,8 +193,8 @@ declare global {
 }
 
 /**
- * `?debug` only: sums renderer.info over every pass of a frame (PSX renders the scene, the blit and
- * the labels separately, and autoReset would keep just the last one) and exposes it as
+ * `?debug` only: sums renderer.info over every pass of a frame (any extra pass would otherwise be
+ * dropped, since autoReset keeps just the last one) and exposes it as
  * `window.__renderInfo()` for the perf harness.
  */
 function RenderStats() {

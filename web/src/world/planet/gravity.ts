@@ -1,8 +1,9 @@
-// Planet gravity math (pure). Gravity points at the planet centre (world origin) with constant
-// magnitude PLANET_GRAVITY: the planet is tiny, so a 1/r² falloff would only make jumps floaty.
+// Planet gravity math (pure). Gravity points at the planet centre (world origin), or along a planar
+// pad's normal over one (planet/up.ts), with constant magnitude PLANET_GRAVITY: the planet is tiny, so a 1/r² falloff would only make jumps floaty.
 
 import type { Vector3 } from "three";
 import { PLANET_GRAVITY } from "./config";
+import { groundUpXYZ } from "./up";
 
 /** Anything with x/y/z: three's Vector3 and Rapier's Vector both qualify. */
 export interface Vec3Like {
@@ -12,15 +13,19 @@ export interface Vec3Like {
 }
 
 /**
- * Force (N) on a body of `mass` (kg) at `position`: −normalize(position) × PLANET_GRAVITY × mass.
- * Zero at the exact centre. Writes into and returns `out`.
+ * Force (N) on a body of `mass` (kg) at `position`: −up × PLANET_GRAVITY × mass, where up is radial
+ * except over planar pads (planet/up.ts). Zero at the exact centre. Writes into and returns `out`.
  */
 export function gravityForce<T extends Vec3Like = Vector3>(position: Vec3Like, mass: number, out: T): T {
-  const l = Math.hypot(position.x, position.y, position.z);
-  const k = l > 1e-9 ? (-PLANET_GRAVITY * mass) / l : 0;
-  out.x = position.x * k;
-  out.y = position.y * k;
-  out.z = position.z * k;
+  if (Math.hypot(position.x, position.y, position.z) < 1e-9) {
+    out.x = out.y = out.z = 0;
+    return out;
+  }
+  groundUpXYZ(position.x, position.y, position.z, out);
+  const k = -PLANET_GRAVITY * mass;
+  out.x *= k;
+  out.y *= k;
+  out.z *= k;
   return out;
 }
 

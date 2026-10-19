@@ -2,7 +2,7 @@
 // handled by InteractionController with a DOM listener so they can ignore keys typed into the overlay.
 import type { KeyboardControlsEntry } from "@react-three/drei";
 
-export type Control = "forward" | "back" | "left" | "right" | "brake" | "reset";
+export type Control = "forward" | "back" | "left" | "right" | "brake" | "reset" | "horn";
 
 export const KEYMAP: KeyboardControlsEntry<Control>[] = [
   { name: "forward", keys: ["KeyW", "ArrowUp"] },
@@ -11,6 +11,7 @@ export const KEYMAP: KeyboardControlsEntry<Control>[] = [
   { name: "right", keys: ["KeyD", "ArrowRight"] },
   { name: "brake", keys: ["Space"] },
   { name: "reset", keys: ["KeyR"] },
+  { name: "horn", keys: ["KeyH"] },
 ];
 
 export const INTERACT_KEYS = new Set(["KeyE", "Enter", "NumpadEnter"]);

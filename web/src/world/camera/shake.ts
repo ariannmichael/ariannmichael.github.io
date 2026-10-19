@@ -96,3 +96,80 @@ export function shakeOffsets(amount: number, time: number, out: ShakeOffsets, sc
   out.pitch = SHAKE.maxAim * a * noise1(t + 401.9);
   return out;
 }
+
+// --- FOV punch: a short field-of-view kick on landings and crashes ---
+// An underdamped spring rather than an instant offset: an impulse sets its velocity, so the FOV
+// swells over a few frames, overshoots a touch and settles (an instant jump would read as a glitch).
+// FollowCamera adds it on top of the speed FOV; it's off with prefers-reduced-motion.
+
+export const FOV_PUNCH = {
+  /** Spring stiffness (1/s²) and damping ratio */
+  stiffness: 150,
+  damping: 0.55,
+  /** Velocity (deg/s) per degree of requested peak, so `addFovPunch(d)` peaks at about `d` degrees */
+  impulsePerDeg: 23,
+  /** The punch never exceeds this many degrees either way */
+  maxDeg: 7,
+  /** Landing: degrees wider at full strength (the world "whomps" outward on touchdown) */
+  landingDeg: 5,
+  /** Crash: degrees narrower at full strength (a punch-in on the hit) */
+  crashDeg: -4,
+  /** Events weaker than this don't punch */
+  minStrength: 0.15,
+  /** Integration substep (s) */
+  maxStep: 1 / 120,
+} as const;
+
+/** Global, mutable FOV punch state (read and advanced by FollowCamera). */
+export const fovPunchState = {
+  /** Current offset (degrees) */
+  value: 0,
+  velocity: 0,
+};
+
+/** Punch the FOV by roughly `degrees` at the peak (negative narrows). */
+export function addFovPunch(degrees: number, state = fovPunchState): void {
+  if (!Number.isFinite(degrees) || degrees === 0) return;
+  state.velocity += degrees * FOV_PUNCH.impulsePerDeg;
+}
+
+/** Punch for a landing (strength 0..1); 0 for soft ones. */
+export function landingFovPunch(strength: number): number {
+  return strength < FOV_PUNCH.minStrength ? 0 : FOV_PUNCH.landingDeg * clamp(strength, 0, 1);
+}
+
+/** Punch for a crash (strength 0..1); 0 for light ones. */
+export function crashFovPunch(strength: number): number {
+  return strength < FOV_PUNCH.minStrength ? 0 : FOV_PUNCH.crashDeg * clamp(strength, 0, 1);
+}
+
+/** Advance the punch spring by `dt` seconds; returns the offset in degrees. */
+export function stepFovPunch(dt: number, state = fovPunchState): number {
+  if (!(dt > 0)) return state.value;
+  const k = FOV_PUNCH.stiffness;
+  const c = 2 * FOV_PUNCH.damping * Math.sqrt(k);
+  let left = dt;
+  while (left > 1e-6) {
+    const h = Math.min(FOV_PUNCH.maxStep, left);
+    left -= h;
+    state.velocity += (-k * state.value - c * state.velocity) * h;
+    state.value += state.velocity * h;
+  }
+  if (Math.abs(state.value) > FOV_PUNCH.maxDeg) {
+    state.value = clamp(state.value, -FOV_PUNCH.maxDeg, FOV_PUNCH.maxDeg);
+    state.velocity = 0;
+  }
+  // Settle to exactly 0 so FollowCamera stops touching the projection matrix
+  if (Math.abs(state.value) < 1e-3 && Math.abs(state.velocity) < 1e-2) {
+    state.value = 0;
+    state.velocity = 0;
+  }
+  return state.value;
+}
+
+/** Drop any punch in flight (reduced motion, intro). */
+export function resetFovPunch(state = fovPunchState): number {
+  state.value = 0;
+  state.velocity = 0;
+  return 0;
+}

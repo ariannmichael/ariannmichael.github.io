@@ -1,3 +1,4 @@
+import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { PLANET_LAYOUTS } from "@/world/layout/planet";
 import { BIOMES } from "./biomes";
@@ -5,6 +6,8 @@ import { PLANET_RADIUS } from "./config";
 import { layoutObstacles } from "./obstacles";
 import { ROAD_BED_SHOULDER, ROAD_HALF_WIDTH, ROAD_LINKS, applyRoadBed, getRoads, nearestRoadXYZ, prepareRoads } from "./roads";
 import { ROAD_DATA } from "./roads.generated";
+import { PORT_CLEARANCE, PORT_FILLET } from "./roadRoute";
+import { PORT_LEAD, findRoadPort, portPose } from "./roadPorts";
 import { latLonToDir } from "./sphere";
 
 const R = PLANET_RADIUS;
@@ -30,9 +33,27 @@ describe("road network", () => {
     expect([...seen].sort()).toEqual(BIOMES.map((b) => b.id).sort());
   });
 
-  it("starts and ends near each biome's spawn", () => {
+  it("starts and ends on its towns' road ports, square to the tile edge", () => {
+    for (const r of roads) {
+      for (const [here, there, k, k2] of [[r.from, r.to, 0, 1], [r.to, r.from, r.count - 1, r.count - 2]] as const) {
+        const port = findRoadPort(here, there);
+        if (!port) continue;
+        const p = portPose(port);
+        const end = new Vector3(r.p[k * 3], r.p[k * 3 + 1], r.p[k * 3 + 2]);
+        expect(end.angleTo(p.edge) * R, `${r.from} → ${r.to} at ${here}`).toBeLessThan(0.01);
+        // Compared in the tangent plane at the edge (the tile's own plane tilts by ~2.5° there)
+        const up = end.clone().normalize();
+        const flat = (v: Vector3) => v.addScaledVector(up, -v.dot(up)).normalize();
+        const next = flat(new Vector3(r.p[k2 * 3], r.p[k2 * 3 + 1], r.p[k2 * 3 + 2]).sub(end));
+        expect(next.dot(flat(p.heading.clone())), `${r.from} → ${r.to} leaves ${here} square`).toBeGreaterThan(0.9995);
+      }
+    }
+  });
+
+  it("starts and ends near each biome's spawn where a town has no port", () => {
     for (const r of roads) {
       for (const [id, k] of [[r.from, 0], [r.to, r.count - 1]] as const) {
+        if (findRoadPort(id, id === r.from ? r.to : r.from)) continue;
         const s = PLANET_LAYOUTS.find((l) => l.biome === id)!.spawn;
         const d = latLonToDir(s.lat, s.lon);
         const gap = Math.acos(Math.min(1, d.x * r.p[k * 3] + d.y * r.p[k * 3 + 1] + d.z * r.p[k * 3 + 2])) * R;
@@ -46,12 +67,20 @@ describe("road network", () => {
 
   it("stays clear of every building, prop and parking ring (layouts changed? run `npm run roads`)", () => {
     const bed = ROAD_HALF_WIDTH + ROAD_BED_SHOULDER;
+    // Out of a port (its straight lead and the turn onto the route) only the paved width keeps clear:
+    // that stretch is in town, on pads, where the bed's shoulder is not needed
+    const portZone = (PORT_LEAD + PORT_FILLET) / 2 + 1;
     for (const o of layoutObstacles()) {
       for (const r of roads) {
+        const portA = !!findRoadPort(r.from, r.to);
+        const portB = !!findRoadPort(r.to, r.from);
         for (let i = 0; i < r.count; i++) {
           const c = o.x * r.p[i * 3] + o.y * r.p[i * 3 + 1] + o.z * r.p[i * 3 + 2];
           const d = Math.acos(Math.min(1, c)) * R;
-          expect(d, `${r.from} → ${r.to} point ${i}`).toBeGreaterThan(o.r + bed);
+          // The port's own lead may pass anything: the town chose where its street ends
+          if ((portA && i <= PORT_LEAD / 2) || (portB && i >= r.count - 1 - PORT_LEAD / 2)) continue;
+          const inTown = (portA && i <= portZone) || (portB && i >= r.count - 1 - portZone);
+          expect(d, `${r.from} → ${r.to} point ${i}`).toBeGreaterThan(o.r + (inTown ? PORT_CLEARANCE - 0.05 : bed));
         }
       }
     }

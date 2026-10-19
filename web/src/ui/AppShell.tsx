@@ -19,7 +19,13 @@ export default function AppShell({ district }: { district: DistrictId }) {
         <div className={styles.brand}>
           <h1 className={styles.name}>{profile.name}</h1>
           <p className={styles.headline}>{profile.headline}</p>
-          <TrackedLink className={styles.cvButton} href={links.cv} download event="cv_download">
+          <TrackedLink
+            className={styles.cvButton}
+            href={links.cv}
+            download
+            event="cv_download"
+            aria-label="Download CV"
+          >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
                 d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14"
@@ -30,7 +36,7 @@ export default function AppShell({ district }: { district: DistrictId }) {
                 strokeLinejoin="round"
               />
             </svg>
-            Download CV
+            <span className={styles.cvText}>Download CV</span>
           </TrackedLink>
         </div>
 

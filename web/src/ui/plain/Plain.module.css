@@ -110,7 +110,8 @@
 
 /* ---------- Hero ---------- */
 .hero {
-  padding: var(--space-7) 0 var(--space-6);
+  /* block-only: the horizontal gutter comes from .container, which shares this element */
+  padding-block: var(--space-7) var(--space-6);
 }
 
 .name {
@@ -183,7 +184,7 @@
 
 /* ---------- Sections ---------- */
 .section {
-  padding: var(--space-6) 0;
+  padding-block: var(--space-6);
   border-top: 1px solid var(--border);
 }
 
@@ -538,7 +539,7 @@
 
 /* ---------- Footer ---------- */
 .footer {
-  padding: var(--space-6) 0 var(--space-7);
+  padding-block: var(--space-6) var(--space-7);
   border-top: 1px solid var(--border);
   font-size: var(--text-sm);
   color: var(--text-muted);

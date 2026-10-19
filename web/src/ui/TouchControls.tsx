@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, type PointerEvent } from "react";
 import { useAppStore } from "@/state/useAppStore";
 import { useInputStore } from "@/state/useInputStore";
 import { joystickAxes } from "@/ui/lib/joystick";
@@ -30,8 +30,29 @@ function Controls() {
     [],
   );
 
+  // A finger can vanish without a pointerup (app switch, notification shade, tab hidden, an alert):
+  // drop every held input so the car never keeps driving on its own.
+  useEffect(() => {
+    const letGo = () => {
+      useInputStore.getState().setAxes(0, 0);
+      useInputStore.getState().setBrake(false);
+    };
+    const onVisibility = () => {
+      if (document.hidden) letGo();
+    };
+    window.addEventListener("blur", letGo);
+    window.addEventListener("pagehide", letGo);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", letGo);
+      window.removeEventListener("pagehide", letGo);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
-    <div className={styles.root}>
+    // The long-press menu would otherwise pop up over a held button on Android
+    <div className={styles.root} onContextMenu={(e) => e.preventDefault()}>
       <Joystick />
       <div className={styles.buttons}>
         <button
@@ -58,7 +79,17 @@ function Controls() {
           aria-label="Interact"
           onClick={pressInteract}
         >
-          E
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+            <path
+              d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0 0V8.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.5a6 6 0 0 1-4.8-2.4L4 15.5a1.5 1.5 0 0 1 2.3-1.9L9 16z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className={styles.btnLabel}>Open</span>
         </button>
         <button
           type="button"
@@ -66,6 +97,7 @@ function Controls() {
           aria-label="Brake"
           // Hold to brake: release on up, cancel, or the finger sliding off.
           onPointerDown={(e) => {
+            e.preventDefault();
             e.currentTarget.setPointerCapture?.(e.pointerId);
             markDriving();
             setBrake(true);
@@ -105,15 +137,27 @@ function Joystick() {
     if (knobRef.current) knobRef.current.style.transform = `translate(${r.knobX}px, ${r.knobY}px)`;
   }
 
-  function release() {
+  // Only touches refs and the store, so it is stable and safe to hand to window listeners.
+  const release = useCallback(() => {
     pointerId.current = null;
     useInputStore.getState().setAxes(0, 0);
     if (knobRef.current) knobRef.current.style.transform = "";
     baseRef.current?.removeAttribute("data-active");
-  }
+  }, []);
+
+  // The page lost the finger without telling us (blur, app switch): recentre the knob too.
+  useEffect(() => {
+    window.addEventListener("blur", release);
+    window.addEventListener("pagehide", release);
+    return () => {
+      window.removeEventListener("blur", release);
+      window.removeEventListener("pagehide", release);
+    };
+  }, [release]);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (pointerId.current !== null) return;
+    e.preventDefault();
     const base = baseRef.current;
     if (!base) return;
     pointerId.current = e.pointerId;
