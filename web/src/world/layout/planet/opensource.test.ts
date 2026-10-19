@@ -32,8 +32,12 @@ describe("opensource layout (Alien Crater)", () => {
     expect(blockersOnPath(opensourceLayout, lane(pts))).toEqual([]);
     const centre: [number, number][] = [];
     for (let f = -30; f <= 16; f += 1) centre.push([f, 0]);
-    for (let r = 0; r >= -14; r -= 1) centre.push([16, r]);
+    for (let r = 0; r >= -4; r -= 1) centre.push([16, r]);
     expect(maxGrade(lane(centre))).toBeLessThan(0.3);
+    // Out of the exit gate the ground climbs 4 m to the spawn ridge along EXIT_RAMP (about 0.27 average)
+    const exit: [number, number][] = [];
+    for (let r = -4; r >= -26; r -= 1) exit.push([16, r]);
+    expect(maxGrade(lane(exit))).toBeLessThan(0.36);
   });
 
   it("the drive from the spawn down into the crater is drivable", () => {

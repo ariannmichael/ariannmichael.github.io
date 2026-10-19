@@ -72,6 +72,21 @@ const NORTH_RAMP: { at: [number, number]; height: number }[] = [
   { at: [-8.7, -12.9], height: -3.9 - -4.38 },
   { at: [-10.6, -13.3], height: -3.9 - -4.76 },
 ];
+// East exit (the corner's gate, heading west): the lab floor is at DOOR_LEVEL but the ridge it was cut
+// into rises 5 m within 7 m of the gate (grade ~1), which tipped the car. A chain of pads every 1.9 m now
+// grades from the gate (-2.1 m) up to the crest of NORTH_RAMP (about 2.3 m on the mesh, at
+// (11.3, -9.1)) at a 0.3 grade over 15 m. The chain stops 4 m short of that crest, so the spawn ramp
+// keeps its own shape.
+const EXIT_RAMP: { at: [number, number]; height: number }[] = [
+  { at: [12.0, 8.0], height: -2.10 - 2.72 },
+  { at: [11.9, 6.1], height: -1.55 - 2.97 },
+  { at: [11.8, 4.2], height: -1.00 - 3.32 },
+  { at: [11.8, 2.3], height: -0.40 - 3.56 },
+  { at: [11.7, 0.4], height: 0.20 - 3.61 },
+  { at: [11.6, -1.5], height: 0.80 - 3.69 },
+  { at: [11.5, -3.4], height: 1.40 - 3.98 },
+  { at: [11.5, -5.3], height: 2.00 - 4.31 },
+];
 const TERRACES: { at: [number, number]; radius: number; blend: number; height: number }[] = [
   { at: [-10.5, -8], radius: 6, blend: 10, height: -3.0 - -1.92 }, // west drive: one landing above the bowl, blending to the laser door
   { at: [-21, -8], radius: 4.5, blend: 8, height: -4.2 - -3.55 }, // south drive, round the rim to the pass
@@ -258,10 +273,12 @@ export const opensourceLayout: BiomeLayout = {
     s.pad(-29, 1, 4, { blend: 10, height: H.pass }), // a pass cut through the central ridge, toward the entry gate
     // The ramp comes after the bowl and the terraces: their wide blend rings reach under the road,
     // so the ramp pads must be applied last to carve it at its own grade through the crater wall
-    ...NORTH_RAMP.map((p) => s.pad(...p.at, 2, { blend: 3, height: p.height })),
+    ...NORTH_RAMP.map((p) => s.pad(...p.at, 1, { blend: 5, height: p.height })),
     ...rim,
     ...PROP_PADS,
     ...OPENSOURCE_LAB_PADS,
+    // After the lab pads: the exit apron's flat core and blend would otherwise flatten the ramp's start
+    ...EXIT_RAMP.map((p) => s.pad(...p.at, 1, { blend: 5, height: p.height })),
   ],
   markers: [s.marker(-14, -15, { id: "openmined", kind: "job", label: "OpenMined" })],
   placements: [...lab(), ...base, ...rocks],

@@ -100,20 +100,23 @@ Feedback received during S3. Agents are capped at 3 running at once.
   - [x] Final screenshot QA of all 8 towns, interiors, hubs and the healthcare approach: no blockers (changelog "Final QA")
   - [x] Dusk pattern: the cozy-pass grain hash (the classic sin hash makes a diagonal lattice, weighted 3× on dark pixels); replaced with the Hoskins hash
   - [x] Changelog and testing doc updated; committed on `planet`
-- [ ] S4.13 Publish (go-live) to `ariannmichael.github.io`:
-  - [x] committed on `planet` (`d1155ae`, then `8ea32f2`: the root layout props are typed by hand, because a clean checkout failed typecheck on Next's generated `LayoutProps`)
-  - [x] clean-clone rehearsal of the deploy workflow (`npm ci`, typecheck, lint, 487 tests, build with 13 static pages) passes
-  - [x] remote `origin` added; the merge commit is prepared locally as branch `release-merge` (`f2a507c`: the planet tree, with `origin/main` (old site) and `planet` as parents, so the push is a fast-forward, no force)
-  - [ ] switch Pages to Actions: `gh api -X PUT repos/ariannmichael/ariannmichael.github.io/pages -f build_type=workflow` (denied by the auto-mode classifier as a production deploy; waiting for the user)
-  - [ ] `git push origin release-merge:main`, then watch the Actions run and load https://ariannmichael.github.io/
-  - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`, source `main` or `legacy-site`
-- [ ] S4.12 Follow-ups from the final QA (not blockers; after the first publish):
-  - [ ] Alien Crater lab east exit: steep slope tips the car (upDot 0.67 at 20 km/h), likely where the exit gate meets the terrain in `opensource.ts`
-  - [ ] Healthcare approach crest: the car tips about 28° at about 30 km/h and briefly drops to 2–3 wheels on the ground (it stays grounded); soften the crest in the hall-approach pad in `healthcare.ts`
-  - [ ] Desert Mesa hub: the road stub looks like a floating slab over the dune (`roadHubs.ts` pad `height`/`onGround`)
-  - [ ] Financial hall east exit, arcade east exit and dungeon south exit drop onto steep slopes (upDot 0.74–0.95)
-  - [ ] Gamedev spawn-back camera sits right behind a large boulder (`gamedev.ts`)
-  - [ ] Verify the grey sign flicker fix on distant signs, and the grain on a real GPU
+- [x] S4.13 Published (go-live) to https://ariannmichael.github.io/ on 2026-10-19:
+  - [x] Pages switched to `build_type=workflow` (run by the user; the auto-mode classifier blocks production deploys from the agent)
+  - [x] first push (`5c2454b..7902466`, a fast-forward merge of the old `main` with the `planet` tree, no force-push): the workflow failed at `npm ci` (`Missing: @emnapi/runtime@1.11.3 from lock file`; the lock only had nested 1.10.0 copies), nothing deployed
+  - [x] fix: `@emnapi/core` and `@emnapi/runtime` added as dev dependencies (`40147da`); second push (`7902466..40147da`) deployed: install, typecheck, lint, 487 tests, build and deploy all green
+  - [x] verified live: `/`, `/plain/`, `/district/raceway/`, the CV PDF, the apple icon and the tractor sample return 200; headless Chrome loads desktop 1280×800 and phone 390×844 with a canvas, no console errors and no failed requests
+  - Rollback: the old site is in the `legacy-site` branch and the `legacy-v1` tag (`5c2454b`); switch Pages back to `build_type=legacy`
+  - Future deploys: commit on `planet`, then push to `main` (the live `main` has the merge history, so build the next push on top of `origin/main` or merge `planet` into it)
+- [x] S4.12 Follow-ups from the final QA (2026-10-19):
+  - [x] Road z-fighting flicker at the starting road: the cause is tile against tile (the 1.02 tile scale overlaps neighbours by 8 cm, so their tops are within 1 mm). Fixed by giving each standard tile a stacking level (a greedy 2-colouring of edge neighbours within 9 m) and lifting it 4 mm per level (`layout/planet/index.ts`, test `roadTileStacking.test.ts`). Home speckle counts: 94 → 12 at 5 m, 106 → 21 at 15 m, and 126 → 8 and 156 → 13 at the close driving range
+  - [x] Alien Crater lab east exit: an 8-pad ramp chain grades the exit; worst tilt at 20 km/h 0.67 → 0.94 (steepest step 0.33–0.37, so `opensource.test.ts` allows 0.36 on the exit leg, the corridor leg stays at 0.3)
+  - [x] Dungeon south exit graded (upDot 1.0 through the exit); arcade east exit already measured fine (0.94–1.0)
+  - [x] Gamedev spawn-back camera: the park-entrance base moved 2 m
+  - [x] Healthcare approach crest: the connector pad is replaced by a small `APPROACH` pad list after the hall pad; crest above the chord 1.03 → 0.22 m, and at 30 km/h the car keeps 4 wheels (upDot at least 0.975, before 0.88–0.93 on 2–3 wheels)
+  - [x] Financial hall east exit: ramp pads re-tuned, new `RAMP_LIP` pad, `H_MESA` 3.97 → 3.6; max grade 0.99 → 0.249, worst tilt 43.9° → 13.9°
+  - [ ] Desert Mesa hub stub: measured within 0.05 m of the ground, but the flat tile with its kerbs still reads as a slab over the dune (an apron or ramp mesh would fix it)
+  - [ ] A few far-away corner seams still show speckle (Home at 15 m yaw 70, 83 speckles, same as before the fix; diagonal-neighbour colouring (reach 12) was tried and made other poses worse)
+  - [ ] Verify the grey sign flicker fix on distant signs, and the grain, on a real GPU
   - [ ] Real-device pass on iPhone and Android (see the testing doc, section 7)
 
 **Resuming after a usage-limit stop:** the agents keep their work. Resume each one from its saved state with SendMessage (agents are tracked by the coordinator session). Check `git status` first, since several agents share the tree. Run vitest only from `web/`. Only one `next dev` can run per directory.

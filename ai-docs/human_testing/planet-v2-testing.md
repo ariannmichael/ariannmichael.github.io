@@ -100,7 +100,7 @@ Drive in, move around inside, and drive out. The camera should never get stuck i
 - [ ] Cards and the GPS menu are readable and scroll, and the close button (44 px) can be tapped.
 - [ ] Rotating to landscape and back keeps everything usable.
 - [ ] `/plain/` is readable on the phone with proper side margins; the "Plain view" link works from the HUD.
-- [ ] Add to Home Screen shows a clean icon (a scene with a car, not a half-cut caption).
+- [ ] The browser tab shows the **old site's icon** (a purple circle with a cream "A"), not the Next.js default, and Add to Home Screen shows the same "A" on purple.
 
 ## 8. Other pages
 - [ ] `/plain/`: the full résumé, readable in light and dark mode, with Download CV working.

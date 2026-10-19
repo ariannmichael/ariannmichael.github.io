@@ -36,15 +36,23 @@ const ROAD = FINANCIAL_ROAD;
 // climb and the road grade.
 const H_SPAWN = 0.8;
 const H_HALL = 5.18;
-const H_MESA = 3.97;
+const H_MESA = 3.6;
 export const FINANCIAL_RAMP: { t: number; height: number }[] = [
-  { t: 26.5, height: 6.24 },
-  { t: 28.5, height: 6.36 },
-  { t: 30.5, height: 6.4 },
-  { t: 32.5, height: 6.32 },
-  { t: 34.5, height: 5.96 },
+  { t: 26.5, height: 6.14 },
+  { t: 28.5, height: 6.16 },
+  { t: 30.5, height: 6.15 },
+  { t: 32.5, height: 6.02 },
+  { t: 34.5, height: 5.61 },
 ];
-const RAMP_PAD = { radius: 1, blend: 3 };
+/**
+ * The ramp's last pad, where it meets the plateau's rim. The mesa is a shallow bowl (its planar ring
+ * holds the rim at ~0.5 m above the centre), so with the ramp ending short the last 2 m were a lip the
+ * car tipped over (about 42° at 20 km/h). Kept out of FINANCIAL_RAMP: the climb test compares those pads
+ * with the mesa centre. The mesh is 3.8 m between vertices, so the radius must be about 2.5 m or it
+ * isn't resolved at all.
+ */
+const RAMP_LIP = { t: 36, height: 4.5, radius: 2.6, blend: 2 };
+const RAMP_PAD = { radius: 2.2, blend: 3 };
 /** Mesa-top centre along the road (t, r) */
 const MESA_AT: [number, number] = [47.5, -3];
 
@@ -149,6 +157,7 @@ const pads = [
   // spine's cliff-edge ring
   s.pad(...HALL.ne(...HALL_PAD), 15, { blend: 6, height: H_HALL, planar: true }),
   ...FINANCIAL_RAMP.map(({ t, height }) => s.pad(...ROAD.ne(t, 0), RAMP_PAD.radius, { blend: RAMP_PAD.blend, height })),
+  s.pad(...ROAD.ne(RAMP_LIP.t, 0), RAMP_LIP.radius, { blend: RAMP_LIP.blend, height: RAMP_LIP.height }),
   s.pad(...ROAD.ne(...MESA_AT), 10, { blend: 5, height: H_MESA, planar: true }), // mesa top
 ];
 

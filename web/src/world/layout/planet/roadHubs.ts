@@ -40,6 +40,7 @@ function crossroad(
   yaw: number,
   ports: [BiomeId, RoadPort["side"]][],
   level = 0,
+  pad: { radius: number; blend: number } = { radius: 6, blend: 4 },
 ): RoadHub {
   const s = site(center(biome));
   const tile = s.place(north, east, { model: CROSS, yaw, scale: ROAD_TILE_SCALE });
@@ -47,7 +48,7 @@ function crossroad(
     biome,
     tiles: [tile],
     // Corners reach 5.9 m; the planar core keeps the whole tile on its own flat ground
-    pads: [s.pad(north, east, 6, { blend: 4, planar: true, onGround: true, height: level })],
+    pads: [s.pad(north, east, pad.radius, { blend: pad.blend, planar: true, onGround: true, height: level })],
     ports: ports.map(([to, side]) => ({ to, tile, side })),
   };
 }
@@ -116,7 +117,7 @@ export const ROAD_HUBS: RoadHub[] = [
   crossroad("gamedev", 24.5, 0, 0, [["healthcare", "+x"], ["financial", "-x"]]),
   // Behind the spawn, on the dune flank past the spawn pad: lowered to the spawn's level (6.4 m).
   // South-west to Game Dev Park, east-south-east to Open Source; the rest into town
-  crossroad("financial", -24, -11, -30, [["gamedev", "-z"], ["opensource", "-x"]], -0.9),
+  crossroad("financial", -24, -11, -30, [["gamedev", "-z"], ["opensource", "-x"]], -1.05, { radius: 7, blend: 7 }),
   // North of the spawn; north-north-west to Fintech Dunes, east-north-east to Hometown
   crossroad("opensource", 31, -7, 35, [["financial", "+z"], ["home", "-x"]]),
 ];
